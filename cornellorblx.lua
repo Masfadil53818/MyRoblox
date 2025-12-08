@@ -1650,3 +1650,135 @@ end
 -- =========================
 toast("Delta Panel loaded. Theme: Dark Purple")
 safeWrite(Settings)
+--========================================================--
+--==================== TAB SYSTEM =========================--
+--========================================================--
+
+local function CreateTabSystem()
+    local tab = CreateTab("System")
+
+    local saveBtn = CreateButton(tab, "Save Settings")
+    saveBtn.MouseButton1Click:Connect(function()
+        SafeSave()
+        Notify("Settings berhasil disimpan!")
+    end)
+
+    local loadBtn = CreateButton(tab, "Load Settings")
+    loadBtn.MouseButton1Click:Connect(function()
+        SafeLoad()
+        ApplyFPS()
+        Notify("Settings berhasil dimuat ulang.")
+    end)
+
+    local resetUIBtn = CreateButton(tab, "Reset UI Position")
+    resetUIBtn.MouseButton1Click:Connect(function()
+        mainFrame.Position = UDim2.new(0.5, -250, 0.5, -150)
+        Notify("Posisi UI direset.")
+    end)
+
+    local killBtn = CreateButton(tab, "Kill Script")
+    killBtn.MouseButton1Click:Connect(function()
+        pcall(function() mainFrame:Destroy() end)
+        Notify("Script dimatikan.")
+    end)
+end
+
+--========================================================--
+--=============== PLAYER UTILITY TAB =====================--
+--========================================================--
+
+local function CreatePlayerTab()
+    local tab = CreateTab("Player")
+
+    local wsSlider = CreateSlider(tab, "Walkspeed", 16, 200, PlayerSettings.WS)
+    wsSlider.Changed:Connect(function(val)
+        PlayerSettings.WS = val
+        SafeSave()
+        pcall(function()
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = val
+        end)
+    end)
+
+    local jpSlider = CreateSlider(tab, "JumpPower", 50, 300, PlayerSettings.JP)
+    jpSlider.Changed:Connect(function(val)
+        PlayerSettings.JP = val
+        SafeSave()
+        pcall(function()
+            game.Players.LocalPlayer.Character.Humanoid.JumpPower = val
+        end)
+    end)
+
+    local resetBtn = CreateButton(tab, "Reset Character")
+    resetBtn.MouseButton1Click:Connect(function()
+        pcall(function()
+            game.Players.LocalPlayer.Character:BreakJoints()
+        end)
+    end)
+
+    local fovSlider = CreateSlider(tab, "FOV", 60, 120, PlayerSettings.FOV)
+    fovSlider.Changed:Connect(function(val)
+        PlayerSettings.FOV = val
+        SafeSave()
+        workspace.CurrentCamera.FieldOfView = val
+    end)
+
+    local shiftToggle = CreateToggle(tab, "Shiftlock", PlayerSettings.Shiftlock)
+    shiftToggle.Toggled:Connect(function(state)
+        PlayerSettings.Shiftlock = state
+        SafeSave()
+        pcall(function()
+            game:GetService("UserSettings").GameSettings.ControlMode = state and Enum.ControlMode.MouseLockSwitch or Enum.ControlMode.Classic
+        end)
+    end)
+end
+
+--========================================================--
+--=============== UTILITY TAB (AntiAFK + Rejoin) =========--
+--========================================================--
+
+local function CreateUtilityTab()
+    local tab = CreateTab("Utility")
+
+    local antiAFKToggle = CreateToggle(tab, "Anti AFK", UserSettings.AntiAFK)
+    antiAFKToggle.Toggled:Connect(function(state)
+        UserSettings.AntiAFK = state
+        SafeSave()
+    end)
+
+    local autoRejoinToggle = CreateToggle(tab, "Auto Rejoin", UserSettings.AutoRejoin)
+    autoRejoinToggle.Toggled:Connect(function(state)
+        UserSettings.AutoRejoin = state
+        SafeSave()
+    end)
+
+    local delaySlider = CreateSlider(tab, "Rejoin Delay", 1, 30, UserSettings.RejoinDelay)
+    delaySlider.Changed:Connect(function(v)
+        UserSettings.RejoinDelay = v
+        SafeSave()
+    end)
+
+    local themeBtn = CreateButton(tab, "Switch Theme (Dark/OLED)")
+    themeBtn.MouseButton1Click:Connect(function()
+        ToggleTheme()
+    end)
+
+    local minimizeBtn = CreateButton(tab, "Minimize UI")
+    minimizeBtn.MouseButton1Click:Connect(function()
+        mainFrame.Visible = false
+        miniIcon.Visible = true
+    end)
+end
+
+--========================================================--
+--======================== INIT ===========================--
+--========================================================--
+
+task.spawn(AutoRejoinLoop)
+task.spawn(AntiafkLoop)
+
+CreateFPSPresetTab()
+CreatePlayerTab()
+CreateUtilityTab()
+CreateTabSystem()
+
+Notify("Panel FPS Boost siap dipakai!")
