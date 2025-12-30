@@ -1,0 +1,78 @@
+--[[ 
+ CornelloTeam – Free Loader
+ GitHub Raw Loader | Delta Executor
+]]
+
+local HttpService = game:GetService("HttpService")
+
+-- ================= CONFIG =================
+local GITHUB_USER = "USERNAME_GITHUB_LU"
+local GITHUB_REPO = "CornelloTeam-Loader"
+local BRANCH = "main"
+
+local MAIN_URL = string.format(
+	"https://raw.githubusercontent.com/%s/%s/%s/CrnXAi.lua",
+	GITHUB_USER,
+	GITHUB_REPO,
+	BRANCH
+)
+
+local VERSION_URL = string.format(
+	"https://raw.githubusercontent.com/%s/%s/%s/version.txt",
+	GITHUB_USER,
+	GITHUB_REPO,
+	BRANCH
+)
+
+-- ================= UTIL =================
+local function notify(t,d)
+	pcall(function()
+		game:GetService("StarterGui"):SetCore("SendNotification",{
+			Title = t,
+			Text = d,
+			Duration = 4
+		})
+	end)
+end
+
+local function httpget(url)
+	return game:HttpGet(url)
+end
+
+-- ================= VERSION CHECK =================
+local function checkVersion()
+	local ok,ver = pcall(function()
+		return httpget(VERSION_URL)
+	end)
+
+	if ok then
+		notify("CornelloTeam","Version "..ver:gsub("%s+",""))
+	else
+		notify("CornelloTeam","Version check gagal, lanjut paksa")
+	end
+end
+
+-- ================= LOAD MAIN =================
+local function loadMain()
+	local ok,src = pcall(function()
+		return httpget(MAIN_URL)
+	end)
+
+	if not ok then
+		notify("CornelloTeam","Gagal load script utama")
+		return
+	end
+
+	local fn,err = loadstring(src)
+	if not fn then
+		notify("CornelloTeam","Loadstring error")
+		warn(err)
+		return
+	end
+
+	fn()
+end
+
+-- ================= EXEC =================
+checkVersion()
+loadMain()
