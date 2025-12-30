@@ -6,8 +6,8 @@
 local HttpService = game:GetService("HttpService")
 
 -- ================= CONFIG =================
-local GITHUB_USER = "USERNAME_GITHUB_LU"
-local GITHUB_REPO = "CornelloTeam-Loader"
+local GITHUB_USER = "Masfadil53818"
+local GITHUB_REPO = "MyRoblox"
 local BRANCH = "main"
 
 local MAIN_URL = string.format(
