@@ -1,7 +1,6 @@
 --[[ 
- CornelloTeam – Disconnect Notify v3.2.1
- FIXED UI | Categorized | Mobile Friendly
- Draggable Icon | Minimize Panel
+ CornelloTeam – Disconnect Notify v3.4.1
+ FULL UI | SIDEBAR | CONFIG SAFE | AUTOEXEC FIX | TEST WEBHOOK
  Delta Executor Compatible
 --]]
 
@@ -17,6 +16,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local Player = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
+
+-- ================= FILE =================
 local CONFIG_FILE = "Cornello_Disconnect.json"
 local AUTOEXEC_FILE = "Cornello_AutoExec.flag"
 
@@ -24,8 +25,8 @@ pcall(function()
 	UserInputService.MouseIconEnabled = false
 end)
 
--- ================= CONFIG =================
-local Config = {
+-- ================= DEFAULT CONFIG =================
+local DefaultConfig = {
 	Webhooks = {},
 	DiscordID = "",
 
@@ -38,8 +39,15 @@ local Config = {
 	AutoClickDelay = 600,
 
 	AutoSave = true,
-	AutoExecute = false
+	AutoExecute = false,
+
+	ReconnectCount = 0,
+	LastDisconnect = "None",
+	SafeMode = true
 }
+
+local Config = table.clone(DefaultConfig)
+local ConfigLoaded = false
 
 -- ================= UTILS =================
 local function Notify(t,d)
@@ -52,20 +60,35 @@ local function Notify(t,d)
 	end)
 end
 
-local function SaveConfig(force)
-	if Config.AutoSave or force then
-		pcall(function()
-			writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
-		end)
+local function ValidateConfig()
+	for k,v in pairs(DefaultConfig) do
+		if Config[k] == nil then
+			Config[k] = v
+		end
 	end
 end
 
 local function LoadConfig()
 	if isfile(CONFIG_FILE) then
-		local data = HttpService:JSONDecode(readfile(CONFIG_FILE))
-		for k,v in pairs(data) do
-			Config[k] = v
+		local ok,data = pcall(function()
+			return HttpService:JSONDecode(readfile(CONFIG_FILE))
+		end)
+		if ok and type(data) == "table" then
+			for k,v in pairs(data) do
+				Config[k] = v
+			end
 		end
+	end
+	ValidateConfig()
+	ConfigLoaded = true
+end
+
+local function SaveConfig(force)
+	if not ConfigLoaded then return end
+	if Config.AutoSave or force then
+		pcall(function()
+			writefile(CONFIG_FILE,HttpService:JSONEncode(Config))
+		end)
 	end
 end
 
@@ -76,6 +99,16 @@ local function UpdateAutoExec()
 		if isfile(AUTOEXEC_FILE) then delfile(AUTOEXEC_FILE) end
 	end
 end
+
+-- ================= LOAD CONFIG FIRST =================
+LoadConfig()
+
+-- AUTOEXEC FIX (INI YANG KEMARIN HILANG)
+if isfile(AUTOEXEC_FILE) then
+	Config.AutoExecute = true
+end
+
+UpdateAutoExec()
 
 -- ================= TIME =================
 local function GetTime()
@@ -88,7 +121,7 @@ end
 -- ================= DISCONNECT =================
 local function ShouldReconnect(msg)
 	msg = string.lower(msg or "")
-	for _,k in ipairs({"disconnect","lost","internet","error","kick"}) do
+	for _,k in ipairs({"disconnect","lost","internet","error"}) do
 		if msg:find(k) then return true end
 	end
 	return false
@@ -98,6 +131,9 @@ local function SendWebhook(reason)
 	if not Config.Notify then return end
 	local time, day = GetTime()
 	local ping = Config.DiscordID ~= "" and "<@"..Config.DiscordID..">" or ""
+
+	Config.LastDisconnect = reason
+	SaveConfig()
 
 	for _,url in ipairs(Config.Webhooks) do
 		pcall(function()
@@ -114,7 +150,8 @@ local function SendWebhook(reason)
 							{name="Player",value=Player.Name},
 							{name="Time",value=time,inline=true},
 							{name="Date",value=day,inline=true},
-							{name="Reason",value=reason}
+							{name="Reason",value=reason},
+							{name="Reconnect Count",value=tostring(Config.ReconnectCount)}
 						}
 					}}
 				})
@@ -123,15 +160,53 @@ local function SendWebhook(reason)
 	end
 end
 
+-- ================= TEST WEBHOOK =================
+local function TestWebhook()
+	if #Config.Webhooks == 0 then
+		Notify("Webhook","Belum ada webhook")
+		return
+	end
+
+	local time, day = GetTime()
+
+	for _,url in ipairs(Config.Webhooks) do
+		pcall(function()
+			request({
+				Url = url,
+				Method = "POST",
+				Headers = {["Content-Type"]="application/json"},
+				Body = HttpService:JSONEncode({
+					content = Config.DiscordID ~= "" and "<@"..Config.DiscordID..">" or "",
+					embeds = {{
+						title = "Webhook Test",
+						description = "Kalau ini masuk, webhook lu hidup dan tidak berkhianat.",
+						color = 0x2ECC71,
+						fields = {
+							{name="Time",value=time,inline=true},
+							{name="Date",value=day,inline=true},
+							{name="Status",value="SUCCESS"}
+						}
+					}}
+				})
+			})
+		end)
+	end
+
+	Notify("Webhook","Test dikirim")
+end
+
 local function TryReconnect(reason)
+	if Config.SafeMode and reason:lower():find("kick") then return end
 	if Config.AutoReconnect and ShouldReconnect(reason) then
+		Config.ReconnectCount += 1
+		SaveConfig()
 		task.delay(Config.ReconnectDelay,function()
 			TeleportService:Teleport(PLACE_ID,Player)
 		end)
 	end
 end
 
--- ================= BACKGROUND TASK =================
+-- ================= BACKGROUND =================
 task.spawn(function()
 	while task.wait(60) do
 		if Config.AntiAFK then
@@ -149,9 +224,9 @@ task.spawn(function()
 			VirtualInput:SendMouseButtonEvent(vp.X/2,vp.Y/2,0,true,game,0)
 			task.wait(0.05)
 			VirtualInput:SendMouseButtonEvent(vp.X/2,vp.Y/2,0,false,game,0)
-			task.wait(Config.AutoClickDelay/1000)
+			task.wait(Config.AutoClickDelay)
 		else
-			task.wait(0.2)
+			task.wait(0.25)
 		end
 	end
 end)
@@ -162,25 +237,25 @@ UI.Name = "CornelloTeamUI"
 UI.ResetOnSpawn = false
 
 -- ================= FLOAT ICON =================
-local Icon = Instance.new("ImageButton",UI)
+local Icon = Instance.new("TextButton",UI)
 Icon.Size = UDim2.fromScale(0.09,0.09)
 Icon.Position = UDim2.fromScale(0.05,0.45)
-Icon.Image = "rbxassetid://7072719338"
+Icon.Text = "C"
+Icon.TextSize = 24
+Icon.Font = Enum.Font.GothamBold
 Icon.BackgroundColor3 = Color3.fromRGB(155,89,182)
-Icon.Active = true
+Icon.TextColor3 = Color3.new(1,1,1)
 Icon.Draggable = true
 Instance.new("UICorner",Icon).CornerRadius = UDim.new(1,0)
 
--- ================= MAIN PANEL =================
+-- ================= MAIN =================
 local Main = Instance.new("Frame",UI)
-Main.Size = UDim2.fromScale(0.52,0.68)
-Main.Position = UDim2.fromScale(0.24,0.16)
+Main.Size = UDim2.fromScale(0.65,0.75)
+Main.Position = UDim2.fromScale(0.175,0.12)
 Main.BackgroundColor3 = Color3.fromRGB(22,22,30)
 Main.Visible = false
-Main.Active = true
 Main.Draggable = true
 Instance.new("UICorner",Main).CornerRadius = UDim.new(0,16)
-Instance.new("UIStroke",Main).Color = Color3.fromRGB(155,89,182)
 
 Icon.MouseButton1Click:Connect(function()
 	Main.Visible = true
@@ -188,114 +263,157 @@ Icon.MouseButton1Click:Connect(function()
 end)
 
 -- ================= HEADER =================
-local Header = Instance.new("Frame",Main)
-Header.Size = UDim2.new(1,0,0,44)
+local Header = Instance.new("TextButton",Main)
+Header.Size = UDim2.new(1,0,0,40)
+Header.Text = "CornelloTeam – Disconnect Notify v3.4.1"
+Header.Font = Enum.Font.GothamBold
+Header.TextSize = 14
+Header.TextColor3 = Color3.new(1,1,1)
 Header.BackgroundTransparency = 1
-
-local Title = Instance.new("TextLabel",Header)
-Title.Size = UDim2.new(1,-60,1,0)
-Title.Position = UDim2.new(0,16,0,0)
-Title.Text = "CornelloTeam – Disconnect Notify"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.TextColor3 = Color3.new(1,1,1)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.BackgroundTransparency = 1
-
-local Min = Instance.new("TextButton",Header)
-Min.Size = UDim2.new(0,32,0,32)
-Min.Position = UDim2.new(1,-40,0.5,-16)
-Min.Text = "—"
-Min.Font = Enum.Font.GothamBold
-Min.TextSize = 18
-Min.TextColor3 = Color3.new(1,1,1)
-Min.BackgroundColor3 = Color3.fromRGB(60,60,80)
-Instance.new("UICorner",Min)
-
-Min.MouseButton1Click:Connect(function()
+Header.MouseButton1Click:Connect(function()
 	Main.Visible = false
 	Icon.Visible = true
 end)
 
--- ================= SCROLL =================
-local Scroll = Instance.new("ScrollingFrame",Main)
-Scroll.Position = UDim2.new(0,0,0,50)
-Scroll.Size = UDim2.new(1,0,1,-50)
-Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-Scroll.CanvasSize = UDim2.new(0,0,0,0)
-Scroll.ScrollBarImageTransparency = 0.4
+-- ================= SIDEBAR =================
+local Sidebar = Instance.new("Frame",Main)
+Sidebar.Size = UDim2.new(0.26,0,1,-40)
+Sidebar.Position = UDim2.new(0,0,0,40)
+Sidebar.BackgroundColor3 = Color3.fromRGB(30,30,40)
 
-local Layout = Instance.new("UIListLayout",Scroll)
-Layout.Padding = UDim.new(0,10)
+local Content = Instance.new("ScrollingFrame",Main)
+Content.Size = UDim2.new(0.74,0,1,-40)
+Content.Position = UDim2.new(0.26,0,0,40)
+Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Content.ScrollBarImageTransparency = 0.4
+Content.BackgroundTransparency = 1
+Instance.new("UIListLayout",Content).Padding = UDim.new(0,10)
 
--- ================= UI HELPERS =================
-local function Section(name)
-	local f = Instance.new("TextLabel",Scroll)
-	f.Size = UDim2.new(1,-20,0,28)
-	f.Position = UDim2.new(0,10,0,0)
-	f.Text = name
-	f.Font = Enum.Font.GothamBold
-	f.TextSize = 13
-	f.TextColor3 = Color3.fromRGB(200,170,255)
-	f.TextXAlignment = Enum.TextXAlignment.Left
-	f.BackgroundTransparency = 1
-	return f
+local function Clear()
+	for _,v in pairs(Content:GetChildren()) do
+		if v:IsA("GuiObject") then v:Destroy() end
+	end
+	Instance.new("UIListLayout",Content).Padding = UDim.new(0,10)
 end
 
-local function Button(text,callback)
-	local b = Instance.new("TextButton",Scroll)
+local function Label(text)
+	local l = Instance.new("TextLabel",Content)
+	l.Size = UDim2.new(1,-20,0,30)
+	l.Text = text
+	l.Font = Enum.Font.GothamBold
+	l.TextSize = 14
+	l.TextXAlignment = Enum.TextXAlignment.Left
+	l.TextColor3 = Color3.fromRGB(200,170,255)
+	l.BackgroundTransparency = 1
+	return l
+end
+
+local function Toggle(text,value,callback)
+	local b = Instance.new("TextButton",Content)
 	b.Size = UDim2.new(1,-20,0,40)
-	b.Position = UDim2.new(0,10,0,0)
-	b.Text = text
+	b.Text = text..": "..(value and "ON" or "OFF")
 	b.Font = Enum.Font.Gotham
 	b.TextSize = 14
 	b.TextColor3 = Color3.new(1,1,1)
-	b.BackgroundColor3 = Color3.fromRGB(50,50,70)
+	b.BackgroundColor3 = value and Color3.fromRGB(120,80,160) or Color3.fromRGB(60,60,80)
 	Instance.new("UICorner",b)
 	b.MouseButton1Click:Connect(function()
-		callback(b)
+		value = not value
+		b.Text = text..": "..(value and "ON" or "OFF")
+		b.BackgroundColor3 = value and Color3.fromRGB(120,80,160) or Color3.fromRGB(60,60,80)
+		callback(value)
 		SaveConfig()
 	end)
 	return b
 end
 
--- ================= SECTIONS =================
-Section("SYSTEM")
-Button("Save Config",function() SaveConfig(true) Notify("CornelloTeam","Config disimpan") end)
-Button("Load Config",function() LoadConfig() Notify("CornelloTeam","Config dimuat") end)
+local function Input(text,default,callback)
+	local t = Instance.new("TextBox",Content)
+	t.Size = UDim2.new(1,-20,0,40)
+	t.PlaceholderText = text
+	t.Text = tostring(default or "")
+	t.Font = Enum.Font.Gotham
+	t.TextSize = 14
+	t.TextColor3 = Color3.new(1,1,1)
+	t.BackgroundColor3 = Color3.fromRGB(50,50,70)
+	Instance.new("UICorner",t)
+	t.FocusLost:Connect(function()
+		callback(t.Text)
+		SaveConfig()
+	end)
+	return t
+end
 
-Button("AutoSave: "..(Config.AutoSave and "ON" or "OFF"),function(b)
-	Config.AutoSave = not Config.AutoSave
-	b.Text = "AutoSave: "..(Config.AutoSave and "ON" or "OFF")
-end)
+-- ================= PANELS =================
+local function UtilityPanel()
+	Clear()
+	Label("UTILITY")
+	Input("Discord ID",Config.DiscordID,function(v) Config.DiscordID=v end)
+	Input("Webhook URL", "", function(v)
+		if v ~= "" then
+			table.insert(Config.Webhooks,v)
+			Notify("Webhook","Ditambahkan")
+		end
+	end)
 
-Button("AutoExecute: "..(Config.AutoExecute and "ON" or "OFF"),function(b)
-	Config.AutoExecute = not Config.AutoExecute
-	UpdateAutoExec()
-	b.Text = "AutoExecute: "..(Config.AutoExecute and "ON" or "OFF")
-end)
+	local testBtn = Instance.new("TextButton",Content)
+	testBtn.Size = UDim2.new(1,-20,0,40)
+	testBtn.Text = "TEST WEBHOOK"
+	testBtn.Font = Enum.Font.GothamBold
+	testBtn.TextSize = 14
+	testBtn.TextColor3 = Color3.new(1,1,1)
+	testBtn.BackgroundColor3 = Color3.fromRGB(70,130,90)
+	Instance.new("UICorner",testBtn)
+	testBtn.MouseButton1Click:Connect(TestWebhook)
 
-Section("CONNECTION")
-Button("Notify Discord: "..(Config.Notify and "ON" or "OFF"),function(b)
-	Config.Notify = not Config.Notify
-	b.Text = "Notify Discord: "..(Config.Notify and "ON" or "OFF")
-end)
+	Toggle("AutoSave",Config.AutoSave,function(v) Config.AutoSave=v end)
+	Toggle("AutoExecute",Config.AutoExecute,function(v)
+		Config.AutoExecute=v
+		UpdateAutoExec()
+	end)
+end
 
-Button("AutoReconnect: "..(Config.AutoReconnect and "ON" or "OFF"),function(b)
-	Config.AutoReconnect = not Config.AutoReconnect
-	b.Text = "AutoReconnect: "..(Config.AutoReconnect and "ON" or "OFF")
-end)
+local function FeaturePanel()
+	Clear()
+	Label("FEATURES")
+	Toggle("AutoReconnect",Config.AutoReconnect,function(v) Config.AutoReconnect=v end)
+	Input("Reconnect Delay (sec)",Config.ReconnectDelay,function(v)
+		Config.ReconnectDelay=tonumber(v) or 5
+	end)
+	Toggle("Anti AFK",Config.AntiAFK,function(v) Config.AntiAFK=v end)
+	Toggle("Auto Click",Config.AutoClick,function(v) Config.AutoClick=v end)
+	Input("AutoClick Delay (sec)",Config.AutoClickDelay,function(v)
+		Config.AutoClickDelay=tonumber(v) or 600
+	end)
+end
 
-Section("UTILITY")
-Button("Anti AFK: "..(Config.AntiAFK and "ON" or "OFF"),function(b)
-	Config.AntiAFK = not Config.AntiAFK
-	b.Text = "Anti AFK: "..(Config.AntiAFK and "ON" or "OFF")
-end)
+local function NotifyPanel()
+	Clear()
+	Label("NOTIFY")
+	Toggle("Discord Notify",Config.Notify,function(v) Config.Notify=v end)
+	Toggle("Safe Mode",Config.SafeMode,function(v) Config.SafeMode=v end)
+	Label("Reconnect Count: "..Config.ReconnectCount)
+	Label("Last Disconnect: "..Config.LastDisconnect)
+end
 
-Button("Auto Click: "..(Config.AutoClick and "ON" or "OFF"),function(b)
-	Config.AutoClick = not Config.AutoClick
-	b.Text = "Auto Click: "..(Config.AutoClick and "ON" or "OFF")
-end)
+local function SideButton(text,callback,y)
+	local b = Instance.new("TextButton",Sidebar)
+	b.Size = UDim2.new(1,-10,0,36)
+	b.Position = UDim2.new(0,5,0,y)
+	b.Text = text
+	b.Font = Enum.Font.Gotham
+	b.TextSize = 13
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(60,60,80)
+	Instance.new("UICorner",b)
+	b.MouseButton1Click:Connect(callback)
+end
+
+SideButton("UTILITY",UtilityPanel,10)
+SideButton("FEATURES",FeaturePanel,56)
+SideButton("NOTIFY",NotifyPanel,102)
+
+UtilityPanel()
 
 -- ================= EVENTS =================
 GuiService.ErrorMessageChanged:Connect(function(msg)
@@ -307,7 +425,4 @@ game:BindToClose(function()
 	SendWebhook("Player Left")
 end)
 
--- ================= INIT =================
-LoadConfig()
-UpdateAutoExec()
-Notify("CornelloTeam","Loaded. Error-free, hidup damai.")
+Notify("CornelloTeam","v3.4.1 Loaded. AutoExec waras. Webhook bisa dites.")
