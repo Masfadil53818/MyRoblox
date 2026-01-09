@@ -61,7 +61,13 @@ local DefaultConfig = {
 	SafeMode = true
 }
 
-local Config = table.clone(DefaultConfig)
+local function cloneTable(t)
+	local out = {}
+	for k,v in pairs(t) do out[k] = v end
+	return out
+end
+
+local Config = (type(table.clone) == "function" and table.clone(DefaultConfig)) or cloneTable(DefaultConfig)
 local ConfigLoaded = false
 
 -- ================= UTILS =================
@@ -124,6 +130,31 @@ if isfile(AUTOEXEC_FILE) then
 end
 
 UpdateAutoExec()
+
+-- ================= SAFE HELPERS =================
+local function tryShowMain()
+	-- Safely attempt to show the main UI without risking calling a nil value
+	if type(_G.ShowMain) == "function" then
+		pcall(_G.ShowMain)
+	elseif type(showMain) == "function" then
+		pcall(showMain)
+	elseif Main and Main.Visible ~= nil then
+		Main.Visible = true
+	end
+end
+
+local function safeCall(fn, ...)
+	if type(fn) == "function" then
+		local ok, err = pcall(fn, ...)
+		if not ok then warn("safeCall error:", err) end
+	else
+		warn("safeCall: attempted to call non-function or nil")
+	end
+end
+
+-- Prevent accidental nil-calls to _G helpers before they are assigned
+if type(_G.ShowMain) ~= "function" then _G.ShowMain = function() end end
+if type(_G.HideMain) ~= "function" then _G.HideMain = function() end end
 
 -- ================= TIME =================
 local function GetTime()
@@ -498,7 +529,7 @@ fb.Text = ((Config.IconBackup ~= "" ) and Config.IconBackup) or "C"
 		fb.AutoButtonColor = true
 		fb.Parent = CoreGui
 		fb.MouseButton1Click:Connect(function()
-			local ok, _ = pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
+			tryShowMain()
 			if Icon then Icon.Visible = false end
 			fb.Visible = false
 		end)
@@ -554,7 +585,7 @@ else
 				alt.Parent = CoreGui
 				alt.ZIndex = 1000
 				alt.MouseButton1Click:Connect(function()
-					pcall(showMain)
+					tryShowMain()
 					if Icon then Icon.Visible = false end
 					alt.Visible = false
 				end)
@@ -582,7 +613,7 @@ if not ok_icon or not Icon then
 	fb.Parent = parent
 	fb.ZIndex = 500
 	fb.MouseButton1Click:Connect(function()
-		pcall(function() if _G.ShowMain then _G.ShowMain() elseif Main and Main.Visible ~= nil then Main.Visible = true end end)
+		tryShowMain()
 		if Icon then Icon.Visible = false end
 		fb.Visible = false
 	end)
@@ -736,7 +767,7 @@ end)
 if Icon then
 	Icon.MouseEnter:Connect(function() pcall(function() tweenObject(Icon, {Size = UDim2.fromScale(0.10,0.10)}, 0.12) end) end)
 	Icon.MouseLeave:Connect(function() pcall(function() tweenObject(Icon, {Size = UDim2.fromScale(0.09,0.09)}, 0.12) end) end)
-	Icon.MouseButton1Click:Connect(function() pcall(showMain) end)
+	Icon.MouseButton1Click:Connect(function() tryShowMain() end)
 end
 
 -- ================= HEADER =================
