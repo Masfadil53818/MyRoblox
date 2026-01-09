@@ -494,43 +494,52 @@ else
 	-- Preload image to detect load failure and create fallback if needed
 	local ContentProvider = game:GetService("ContentProvider")
 	local function ensureIconLoaded()
-		local ok_preload, err = pcall(function()
-			ContentProvider:PreloadAsync({Icon})
-		end)
-		if ok_preload then
-			print("CrnXAi: Icon image preloaded successfully")
-			-- remove fallback if any
-			local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
-			if fb then fb:Destroy() end
-			Icon.Visible = true
-		else
-			warn("CrnXAi: Icon image failed to preload:", err)
-			pcall(Notify, "CornelloTeam", "Gagal memuat ikon, menampilkan fallback")
-			-- create fallback (if not exists) in UI or CoreGui
-			local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
+		local function createFallback(parent)
+			local fb = parent:FindFirstChild("CornelloIconFallback")
 			if not fb then
 				fb = Instance.new("TextButton")
 				fb.Name = "CornelloIconFallback"
 				fb.Size = Icon.Size
 				fb.Position = Icon.Position
-				fb.BackgroundColor3 = Color3.fromRGB(50,50,60)
+				fb.AnchorPoint = Icon.AnchorPoint or Vector2.new(0,0)
+				fb.BackgroundColor3 = Color3.fromRGB(48,48,58)
 				fb.Text = "C"
 				fb.Font = Enum.Font.GothamBold
 				fb.TextSize = 28
 				fb.TextColor3 = Color3.new(1,1,1)
+				fb.TextScaled = true
 				fb.AutoButtonColor = true
 				Instance.new("UICorner", fb).CornerRadius = UDim.new(1,0)
-				-- attach to same parent as Icon if possible
-				local parent = Icon.Parent or UI or CoreGui
+				fb.Visible = false
+				fb.ZIndex = 500
 				fb.Parent = parent
 				fb.MouseButton1Click:Connect(function()
-					if Main and Main.Visible ~= nil then Main.Visible = true end
+					pcall(function() if _G.ShowMain then _G.ShowMain() elseif Main and Main.Visible ~= nil then Main.Visible = true end end)
 					if Icon then Icon.Visible = false end
 					fb.Visible = false
 				end)
-			else
-				fb.Visible = true
 			end
+			return fb
+		end
+
+		local parent = Icon.Parent or UI or CoreGui
+		local fb = createFallback(parent)
+
+		-- attempt preload with retries
+		local ok_preload = false
+		for i=1,3 do
+			local ok, err = pcall(function() ContentProvider:PreloadAsync({Icon}) end)
+			if ok then ok_preload = true break end
+			task.wait(0.6)
+		end
+		if ok_preload then
+			print("CrnXAi: Icon image preloaded successfully")
+			if fb and fb.Parent then pcall(function() fb:Destroy() end) end
+			Icon.Visible = true
+		else
+			warn("CrnXAi: Icon image failed to preload")
+			pcall(Notify, "CornelloTeam", "Gagal memuat ikon, menampilkan fallback")
+			if fb then fb.Visible = true end
 			Icon.Visible = false
 		end
 	end
@@ -562,20 +571,25 @@ end
 if not ok_icon or not Icon then
 	warn("CrnXAi: failed to create Icon")
 	pcall(Notify, "CornelloTeam", "Gagal membuat ikon UI")
-	-- create visible fallback so user still has a way to open UI
-	local fb = Instance.new("TextButton", CoreGui)
+	-- create visible fallback so user still has a way to open UI (try UI parent first)
+	local parent = UI or CoreGui
+	local fb = Instance.new("TextButton")
 	fb.Name = "CornelloIconFallback"
 	fb.Size = UDim2.fromScale(0.09, 0.09)
 	fb.Position = UDim2.fromScale(0.05, 0.45)
-	fb.BackgroundColor3 = Color3.fromRGB(50,50,60)
+	fb.AnchorPoint = Vector2.new(0,0)
+	fb.BackgroundColor3 = Color3.fromRGB(48,48,58)
 	fb.Text = "C"
 	fb.Font = Enum.Font.GothamBold
 	fb.TextSize = 28
+	fb.TextScaled = true
 	fb.TextColor3 = Color3.new(1,1,1)
 	Instance.new("UICorner", fb).CornerRadius = UDim.new(1,0)
 	fb.AutoButtonColor = true
+	fb.Parent = parent
+	fb.ZIndex = 500
 	fb.MouseButton1Click:Connect(function()
-		if Main and Main.Visible ~= nil then Main.Visible = true end
+		pcall(function() if _G.ShowMain then _G.ShowMain() elseif Main and Main.Visible ~= nil then Main.Visible = true end end)
 		if Icon then Icon.Visible = false end
 		fb.Visible = false
 	end)
@@ -585,40 +599,50 @@ else
 	-- Preload image to detect load failure and create fallback if needed
 	local ContentProvider = game:GetService("ContentProvider")
 	local function ensureIconLoaded()
-		local ok_preload, err = pcall(function()
-			ContentProvider:PreloadAsync({Icon})
-		end)
-		if ok_preload then
-			print("CrnXAi: Icon image preloaded successfully")
-			-- remove fallback if any
-			local fb = UI:FindFirstChild("CornelloIconFallback")
-			if fb then fb:Destroy() end
-			Icon.Visible = true
-		else
-			warn("CrnXAi: Icon image failed to preload:", err)
-			pcall(Notify, "CornelloTeam", "Gagal memuat ikon, menampilkan fallback")
-			-- create fallback (if not exists)
+		local function createFallbackInUI()
 			local fb = UI:FindFirstChild("CornelloIconFallback")
 			if not fb then
-				fb = Instance.new("TextButton", UI)
+				fb = Instance.new("TextButton")
 				fb.Name = "CornelloIconFallback"
 				fb.Size = Icon.Size
 				fb.Position = Icon.Position
-				fb.BackgroundColor3 = Color3.fromRGB(50,50,60)
+				fb.AnchorPoint = Icon.AnchorPoint or Vector2.new(0,0)
+				fb.BackgroundColor3 = Color3.fromRGB(48,48,58)
 				fb.Text = "C"
 				fb.Font = Enum.Font.GothamBold
 				fb.TextSize = 28
+				fb.TextScaled = true
 				fb.TextColor3 = Color3.new(1,1,1)
 				fb.AutoButtonColor = true
 				Instance.new("UICorner", fb).CornerRadius = UDim.new(1,0)
+				fb.Visible = false
+				fb.Parent = UI
+				fb.ZIndex = 500
 				fb.MouseButton1Click:Connect(function()
-					if Main and Main.Visible ~= nil then Main.Visible = true end
+					pcall(function() if _G.ShowMain then _G.ShowMain() elseif Main and Main.Visible ~= nil then Main.Visible = true end end)
 					if Icon then Icon.Visible = false end
 					fb.Visible = false
 				end)
-			else
-				fb.Visible = true
 			end
+			return fb
+		end
+
+		local fb = createFallbackInUI()
+
+		local ok_preload = false
+		for i=1,3 do
+			local ok, err = pcall(function() ContentProvider:PreloadAsync({Icon}) end)
+			if ok then ok_preload = true break end
+			task.wait(0.6)
+		end
+		if ok_preload then
+			print("CrnXAi: Icon image preloaded successfully")
+			if fb and fb.Parent then pcall(function() fb:Destroy() end) end
+			Icon.Visible = true
+		else
+			warn("CrnXAi: Icon image failed to preload")
+			pcall(Notify, "CornelloTeam", "Gagal memuat ikon, menampilkan fallback")
+			if fb then fb.Visible = true end
 			Icon.Visible = false
 		end
 	end
