@@ -39,6 +39,11 @@ local DefaultConfig = {
 	AutoClick = false,
 	AutoClickDelay = 600,
 
+	-- Tap settings for mobile/PC: relative 0..1 (x,y) measured from viewport
+	TapLocation = { x = 0.5, y = 0.5 },
+	ShowTapMarker = false,
+	TapMarkerSize = 12,
+
 	AutoSave = true,
 	AutoExecute = false,
 
@@ -209,28 +214,31 @@ end
 
 -- ================= BACKGROUND =================
 
--- Helper: simulate a tap that works for mobile (touch) and PC (mouse) without affecting real mouse
-local function SimulateTapAtCenter()
+-- Helper: simulate a tap at configured location (touch-friendly). Uses Config.TapLocation if available.
+local function SimulateTapAtLocation()
 	local ok, camera = pcall(function() return workspace.CurrentCamera end)
 	if not ok or not camera then return end
 
-	local vx = camera.ViewportSize.X/2
-	local vy = camera.ViewportSize.Y/2
+	local vp = camera.ViewportSize
+	local tx = (Config.TapLocation and Config.TapLocation.x) or 0.5
+	local ty = (Config.TapLocation and Config.TapLocation.y) or 0.5
 
-	-- small jitter so taps don't always land on same pixel (reduce interaction with buttons)
-	local jx = math.random(-8,8)
-	local jy = math.random(-8,8)
+	local vx = vp.X * tx
+	local vy = vp.Y * ty
+
+	-- small jitter to avoid always tapping same pixel
+	local j = math.max(1, math.floor(math.min(vp.X, vp.Y) * 0.01)) -- ~1% of shorter side
+	local jx = math.random(-j, j)
+	local jy = math.random(-j, j)
 	vx = vx + jx
 	vy = vy + jy
 
 	pcall(function()
-		-- prefer touch event if available (some executors expose SendTouchEvent)
 		if VirtualInput and VirtualInput.SendTouchEvent then
 			VirtualInput:SendTouchEvent(true, vx, vy, 0)
 			task.wait(0.05)
 			VirtualInput:SendTouchEvent(false, vx, vy, 0)
 		else
-			-- fallback to mouse button event which many environments emulate as a tap on mobile
 			VirtualInput:SendMouseButtonEvent(vx, vy, 0, true, game, 0)
 			task.wait(0.05)
 			VirtualInput:SendMouseButtonEvent(vx, vy, 0, false, game, 0)
@@ -241,6 +249,87 @@ end
 -- seed random once
 pcall(function() math.randomseed(tick()) end)
 
+-- Tap marker UI and setter
+local RunService = game:GetService("RunService")
+local TapMarker = nil
+local Overlay = nil
+
+local function CreateTapMarker()
+	if TapMarker and TapMarker.Parent then TapMarker:Destroy() TapMarker = nil end
+	if not Config.ShowTapMarker then return end
+	local ok, cam = pcall(function() return workspace.CurrentCamera end)
+	if not ok or not cam then return end
+	TapMarker = Instance.new("Frame", UI)
+	TapMarker.Name = "TapMarker"
+	TapMarker.Size = UDim2.new(0, Config.TapMarkerSize, 0, Config.TapMarkerSize)
+	TapMarker.AnchorPoint = Vector2.new(0.5,0.5)
+	TapMarker.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	TapMarker.BackgroundTransparency = 0.6
+	TapMarker.BorderSizePixel = 0
+	local uc = Instance.new("UICorner", TapMarker)
+	uc.CornerRadius = UDim.new(1,0)
+
+	local function update()
+		local ok2, cam2 = pcall(function() return workspace.CurrentCamera end)
+		if not ok2 or not cam2 then return end
+		local vp = cam2.ViewportSize
+		local x = (Config.TapLocation and Config.TapLocation.x or 0.5) * vp.X
+		local y = (Config.TapLocation and Config.TapLocation.y or 0.5) * vp.Y
+		TapMarker.Position = UDim2.fromOffset(x, y)
+	end
+
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		if TapMarker and TapMarker.Parent then update() else if conn then conn:Disconnect() end end
+	end)
+end
+
+local function RemoveTapMarker()
+	if TapMarker and TapMarker.Parent then TapMarker:Destroy() end
+	TapMarker = nil
+end
+
+local function StartTapSetter()
+	if Overlay and Overlay.Parent then Overlay:Destroy() Overlay=nil end
+	Overlay = Instance.new("TextButton", UI)
+	Overlay.Name = "TapOverlay"
+	Overlay.Size = UDim2.new(1,0,1,0)
+	Overlay.Position = UDim2.new(0,0,0,0)
+	Overlay.BackgroundTransparency = 0.5
+	Overlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	Overlay.Text = "Click/Tap untuk set lokasi tap. Tekan ESC untuk batal."
+	Overlay.Font = Enum.Font.GothamBold
+	Overlay.TextSize = 24
+	Overlay.TextColor3 = Color3.new(1,1,1)
+	Overlay.TextWrapped = true
+	Overlay.AutoButtonColor = false
+	local conn1, conn2
+	conn1 = Overlay.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			local pos = input.Position or UserInputService:GetMouseLocation()
+			local ok, cam = pcall(function() return workspace.CurrentCamera end)
+			if ok and cam then
+				local vp = cam.ViewportSize
+				Config.TapLocation = { x = math.clamp(pos.X / vp.X, 0, 1), y = math.clamp(pos.Y / vp.Y, 0, 1) }
+				SaveConfig()
+				CreateTapMarker()
+				Notify("Tap","Lokasi tap disimpan")
+			end
+			Overlay:Destroy()
+			if conn1 then conn1:Disconnect() end
+			if conn2 then conn2:Disconnect() end
+		end
+	end)
+	conn2 = UserInputService.InputBegan:Connect(function(inp, gp)
+		if inp.KeyCode == Enum.KeyCode.Escape then
+			Overlay:Destroy()
+			if conn1 then conn1:Disconnect() end
+			if conn2 then conn2:Disconnect() end
+			Notify("Tap","Batal")
+		end
+	end)
+end
+
 -- Anti-AFK: perform a gentle tap at center every interval, but skip if user is typing in a textbox
 task.spawn(function()
 	while task.wait(60) do
@@ -249,7 +338,7 @@ task.spawn(function()
 			if ok and focused then
 				-- user is typing; skip this tick
 			else
-				SimulateTapAtCenter()
+				SimulateTapAtLocation()
 			end
 		end
 	end
@@ -264,7 +353,7 @@ task.spawn(function()
 				-- avoid interfering with typing
 				task.wait(0.25)
 			else
-				SimulateTapAtCenter()
+				SimulateTapAtLocation()
 				task.wait(Config.AutoClickDelay)
 			end
 		else
@@ -413,6 +502,63 @@ local function UtilityPanel()
 		Config.AutoExecute=v
 		UpdateAutoExec()
 	end)
+
+	-- Tap location settings
+	Toggle("Show Tap Marker", Config.ShowTapMarker, function(v)
+		Config.ShowTapMarker = v
+		if v then CreateTapMarker() else RemoveTapMarker() end
+		SaveConfig()
+	end)
+
+	local tapLabel = Label("Tap Location: " .. (Config.TapLocation and (math.floor(Config.TapLocation.x*100) .. "% , " .. math.floor(Config.TapLocation.y*100) .. "%") or "Default (Center)"))
+
+	local setTapBtn = Instance.new("TextButton",Content)
+	setTapBtn.Size = UDim2.new(1,-20,0,40)
+	setTapBtn.Text = "SET TAP LOCATION"
+	setTapBtn.Font = Enum.Font.GothamBold
+	setTapBtn.TextSize = 14
+	setTapBtn.TextColor3 = Color3.new(1,1,1)
+	setTapBtn.BackgroundColor3 = Color3.fromRGB(70,130,90)
+	Instance.new("UICorner",setTapBtn)
+	setTapBtn.MouseButton1Click:Connect(function()
+		StartTapSetter()
+		Notify("Tap","Klik layar untuk memilih lokasi")
+		-- update label after a short delay in case user set
+		task.delay(0.5, function()
+			if Config.TapLocation then
+				tapLabel.Text = "Tap Location: " .. math.floor(Config.TapLocation.x*100) .. "% , " .. math.floor(Config.TapLocation.y*100) .. "%"
+			end
+		end)
+	end)
+
+	local clearTapBtn = Instance.new("TextButton",Content)
+	clearTapBtn.Size = UDim2.new(1,-20,0,40)
+	clearTapBtn.Text = "CLEAR TAP LOCATION"
+	clearTapBtn.Font = Enum.Font.GothamBold
+	clearTapBtn.TextSize = 14
+	clearTapBtn.TextColor3 = Color3.new(1,1,1)
+	clearTapBtn.BackgroundColor3 = Color3.fromRGB(120,80,80)
+	Instance.new("UICorner",clearTapBtn)
+	clearTapBtn.MouseButton1Click:Connect(function()
+		Config.TapLocation = { x = 0.5, y = 0.5 }
+		SaveConfig()
+		CreateTapMarker()
+		tapLabel.Text = "Tap Location: Default (Center)"
+		Notify("Tap","Lokasi tap di-reset ke pusat")
+	end)
+
+	local testTapBtn = Instance.new("TextButton",Content)
+	testTapBtn.Size = UDim2.new(1,-20,0,40)
+	testTapBtn.Text = "TEST TAP"
+	testTapBtn.Font = Enum.Font.GothamBold
+	testTapBtn.TextSize = 14
+	testTapBtn.TextColor3 = Color3.new(1,1,1)
+	testTapBtn.BackgroundColor3 = Color3.fromRGB(70,130,90)
+	Instance.new("UICorner",testTapBtn)
+	testTapBtn.MouseButton1Click:Connect(function()
+		SimulateTapAtLocation()
+		Notify("Tap","Test tap dikirim")
+	end)
 end
 
 local function FeaturePanel()
@@ -456,6 +602,9 @@ SideButton("FEATURES",FeaturePanel,56)
 SideButton("NOTIFY",NotifyPanel,102)
 
 UtilityPanel()
+if Config.ShowTapMarker then
+	CreateTapMarker()
+end
 
 -- ================= EVENTS =================
 GuiService.ErrorMessageChanged:Connect(function(msg)
