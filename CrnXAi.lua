@@ -368,16 +368,16 @@ UI.Name = "CornelloTeamUI"
 UI.ResetOnSpawn = false
 
 -- ================= FLOAT ICON =================
-local Icon = Instance.new("TextButton",UI)
-Icon.Size = UDim2.fromScale(0.09,0.09)
-Icon.Position = UDim2.fromScale(0.05,0.45)
-Icon.Text = "C"
-Icon.TextSize = 24
-Icon.Font = Enum.Font.GothamBold
-Icon.BackgroundColor3 = Color3.fromRGB(155,89,182)
-Icon.TextColor3 = Color3.new(1,1,1)
+local Icon = Instance.new("ImageButton", UI)
+Icon.Name = "CornelloIcon"
+Icon.Size = UDim2.fromScale(0.09, 0.09)
+Icon.Position = UDim2.fromScale(0.05, 0.45)
+Icon.BackgroundTransparency = 1
+Icon.Image = "https://i.ibb.co/9mxLgNg7/thumbnail.png"
+Icon.ScaleType = Enum.ScaleType.Fit
+Icon.AutoButtonColor = true
 Icon.Draggable = true
-Instance.new("UICorner",Icon).CornerRadius = UDim.new(1,0)
+Instance.new("UICorner", Icon).CornerRadius = UDim.new(1, 0)
 
 -- ================= MAIN =================
 local Main = Instance.new("Frame",UI)
