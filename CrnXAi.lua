@@ -22,7 +22,8 @@ local CONFIG_FILE = "Cornello_Disconnect.json"
 local AUTOEXEC_FILE = "Cornello_AutoExec.flag"
 
 pcall(function()
-	UserInputService.MouseIconEnabled = false
+	-- Aktifkan mouse icon agar kursor terlihat
+	UserInputService.MouseIconEnabled = true
 end)
 
 -- ================= DEFAULT CONFIG =================
@@ -210,9 +211,10 @@ end
 task.spawn(function()
 	while task.wait(60) do
 		if Config.AntiAFK then
-			VirtualInput:SendKeyEvent(true,Enum.KeyCode.Space,false,game)
+			-- Tekan tombol 'E' sebagai aktivitas anti-AFK (tanpa memakai mouse)
+			VirtualInput:SendKeyEvent(true,Enum.KeyCode.E,false,game)
 			task.wait(0.1)
-			VirtualInput:SendKeyEvent(false,Enum.KeyCode.Space,false,game)
+			VirtualInput:SendKeyEvent(false,Enum.KeyCode.E,false,game)
 		end
 	end
 end)
@@ -220,10 +222,10 @@ end)
 task.spawn(function()
 	while task.wait() do
 		if Config.AutoClick then
-			local vp = workspace.CurrentCamera.ViewportSize
-			VirtualInput:SendMouseButtonEvent(vp.X/2,vp.Y/2,0,true,game,0)
+			-- Ganti auto-click agar menggunakan keypress 'E' (tanpa mouse)
+			VirtualInput:SendKeyEvent(true,Enum.KeyCode.E,false,game)
 			task.wait(0.05)
-			VirtualInput:SendMouseButtonEvent(vp.X/2,vp.Y/2,0,false,game,0)
+			VirtualInput:SendKeyEvent(false,Enum.KeyCode.E,false,game)
 			task.wait(Config.AutoClickDelay)
 		else
 			task.wait(0.25)
