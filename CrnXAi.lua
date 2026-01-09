@@ -17,6 +17,12 @@ local UserInputService = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
 
+-- Ensure script runs on the client (LocalScript). If LocalPlayer is not available, abort early with warning.
+if not Player then
+	warn("CrnXAi: LocalPlayer not found. Ensure this script is a LocalScript placed under StarterPlayerScripts or StarterGui.")
+	return
+end
+
 -- ================= FILE =================
 local CONFIG_FILE = "Cornello_Disconnect.json"
 local AUTOEXEC_FILE = "Cornello_AutoExec.flag"
