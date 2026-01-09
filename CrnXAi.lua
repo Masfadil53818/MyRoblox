@@ -54,6 +54,10 @@ local DefaultConfig = {
 	AutoSave = true,
 	AutoExecute = false,
 
+	-- Icon image (can be customized via Utility panel)
+	IconImage = "https://i.ibb.co/9mxLgNg7/thumbnail.png",
+	IconBackup = "",
+
 	ReconnectCount = 0,
 	LastDisconnect = "None",
 	SafeMode = true
@@ -456,7 +460,7 @@ local ok_icon, Icon = pcall(function()
 	b.Size = UDim2.fromScale(0.09, 0.09)
 	b.Position = UDim2.fromScale(0.05, 0.45)
 	b.BackgroundTransparency = 1
-	b.Image = "https://i.ibb.co/9mxLgNg7/thumbnail.png"
+	b.Image = (Config.IconImage ~= "" and Config.IconImage) or "https://i.ibb.co/9mxLgNg7/thumbnail.png"
 	b.ScaleType = Enum.ScaleType.Fit
 	b.AutoButtonColor = true
 	b.Draggable = true
@@ -475,7 +479,7 @@ if not ok_icon or not Icon then
 		fb.Size = UDim2.fromScale(0.09, 0.09)
 		fb.Position = UDim2.fromScale(0.05, 0.45)
 		fb.BackgroundColor3 = Color3.fromRGB(50,50,60)
-		fb.Text = "C"
+fb.Text = ((Config.IconBackup ~= "" ) and Config.IconBackup) or "C"
 		fb.Font = Enum.Font.GothamBold
 		fb.TextSize = 28
 		fb.TextColor3 = Color3.new(1,1,1)
@@ -608,7 +612,7 @@ else
 				fb.Position = Icon.Position
 				fb.AnchorPoint = Icon.AnchorPoint or Vector2.new(0,0)
 				fb.BackgroundColor3 = Color3.fromRGB(48,48,58)
-				fb.Text = "C"
+			fb.Text = ((Config.IconBackup ~= "" ) and Config.IconBackup) or "C"
 				fb.Font = Enum.Font.GothamBold
 				fb.TextSize = 28
 				fb.TextScaled = true
@@ -892,6 +896,45 @@ local function UtilityPanel()
 	testTapBtn.MouseButton1Click:Connect(function()
 		SimulateTapAtLocation()
 		Notify("Tap","Test tap dikirim")
+	end)
+
+	-- ICON SETTINGS
+	Label("ICON")
+	Input("Icon Image URL", Config.IconImage, function(v) Config.IconImage = v SaveConfig() end)
+	Input("Fallback Text", Config.IconBackup, function(v) Config.IconBackup = v SaveConfig() end)
+
+	local applyIconBtn = Instance.new("TextButton",Content)
+	applyIconBtn.Size = UDim2.new(1,-20,0,40)
+	applyIconBtn.Text = "APPLY ICON"
+	applyIconBtn.Font = Enum.Font.GothamBold
+	applyIconBtn.TextSize = 14
+	applyIconBtn.TextColor3 = Color3.new(1,1,1)
+	applyIconBtn.BackgroundColor3 = Color3.fromRGB(70,130,90)
+	Instance.new("UICorner",applyIconBtn)
+	applyIconBtn.MouseButton1Click:Connect(function()
+		if Config.IconImage and Config.IconImage ~= "" then
+			if Icon then Icon.Image = Config.IconImage end
+			SaveConfig()
+			Notify("Icon","Mencoba memuat ikon baru")
+		else
+			Notify("Icon","URL ikon kosong")
+		end
+	end)
+
+	local resetIconBtn = Instance.new("TextButton",Content)
+	resetIconBtn.Size = UDim2.new(1,-20,0,40)
+	resetIconBtn.Text = "RESET ICON"
+	resetIconBtn.Font = Enum.Font.GothamBold
+	resetIconBtn.TextSize = 14
+	resetIconBtn.TextColor3 = Color3.new(1,1,1)
+	resetIconBtn.BackgroundColor3 = Color3.fromRGB(120,80,80)
+	Instance.new("UICorner",resetIconBtn)
+	resetIconBtn.MouseButton1Click:Connect(function()
+		Config.IconImage = DefaultConfig.IconImage
+		Config.IconBackup = "C"
+		if Icon then Icon.Image = Config.IconImage end
+		SaveConfig()
+		Notify("Icon","Ikon di-reset ke default")
 	end)
 end
 
