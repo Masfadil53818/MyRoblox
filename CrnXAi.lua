@@ -55,8 +55,6 @@ local DefaultConfig = {
 	AutoExecute = false,
 
 	-- Icon image (can be customized via Utility panel)
-	IconImage = "https://i.ibb.co/9mxLgNg7/thumbnail.png",
-	IconBackup = "",
 
 	ReconnectCount = 0,
 	LastDisconnect = "None",
@@ -455,17 +453,30 @@ end)
 
 -- ================= FLOAT ICON =================
 local ok_icon, Icon = pcall(function()
-	local b = Instance.new("ImageButton")
+	local b = Instance.new("TextButton")
 	b.Name = "CornelloIcon"
 	b.Size = UDim2.fromScale(0.09, 0.09)
 	b.Position = UDim2.fromScale(0.05, 0.45)
-	b.BackgroundTransparency = 1
-	b.Image = (Config.IconImage ~= "" and Config.IconImage) or "https://i.ibb.co/9mxLgNg7/thumbnail.png"
-	b.ScaleType = Enum.ScaleType.Fit
+	b.BackgroundColor3 = Color3.fromRGB(24,24,34)
 	b.AutoButtonColor = true
-	b.Draggable = true
 	Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
-	b.Visible = true
+	local grad = Instance.new("UIGradient", b)
+	grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.fromRGB(80,60,120)), ColorSequenceKeypoint.new(1, Color3.fromRGB(60,40,90))}
+	local stroke = Instance.new("UIStroke", b)
+	stroke.Color = Color3.fromRGB(140,120,200)
+	stroke.Thickness = 1
+	local lbl = Instance.new("TextLabel", b)
+	lbl.Name = "IconLabel"
+	lbl.Size = UDim2.fromScale(0.8,0.8)
+	lbl.Position = UDim2.fromScale(0.5,0.5)
+	lbl.AnchorPoint = Vector2.new(0.5,0.5)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = "C"
+	lbl.Font = Enum.Font.GothamBlack
+	lbl.TextScaled = true
+	lbl.TextColor3 = Color3.fromRGB(255,255,255)
+	lbl.ZIndex = 2
+	b.ZIndex = 1000
 	b.Parent = UI
 	return b
 end)
@@ -497,10 +508,10 @@ else
 	pcall(Notify, "CornelloTeam", "Ikon UI dibuat")
 	-- enforce visibility settings and diagnostics
 	Icon.ZIndex = 1000
-	Icon.Visible = false -- will be shown after preload succeeds
-	print("CrnXAi: Icon.Image =", Icon.Image)
+	Icon.Visible = true -- using static 'C' icon by default
+	print("CrnXAi: Icon.Text =", Icon.Text)
 	print("CrnXAi: Icon parent =", Icon.Parent and Icon.Parent:GetFullName())
-	-- short on-screen debug label showing current image
+	-- short on-screen debug label showing current icon text
 	pcall(function()
 		local d = Instance.new("TextLabel", UI)
 		d.Name = "CrnXAi_IconDebug"
@@ -510,87 +521,46 @@ else
 		d.TextColor3 = Color3.new(1,1,1)
 		d.Font = Enum.Font.Gotham
 		d.TextSize = 12
-		d.Text = "Icon: " .. tostring(Icon.Image)
+		d.Text = "Icon: " .. tostring(Icon.Text)
 		Instance.new("UICorner", d).CornerRadius = UDim.new(0,6)
 		task.delay(6, function() if d and d.Parent then d:Destroy() end end)
 	end)
-	-- Preload image to detect load failure and create fallback if needed
-	local ContentProvider = game:GetService("ContentProvider")
-	local function ensureIconLoaded()
-		local function createFallback(parent)
-			local fb = parent:FindFirstChild("CornelloIconFallback")
-			if not fb then
-				fb = Instance.new("TextButton")
-				fb.Name = "CornelloIconFallback"
-				fb.Size = Icon.Size
-				fb.Position = Icon.Position
-				fb.AnchorPoint = Icon.AnchorPoint or Vector2.new(0,0)
-				fb.BackgroundColor3 = Color3.fromRGB(48,48,58)
-				fb.Text = "C"
-				fb.Font = Enum.Font.GothamBold
-				fb.TextSize = 28
-				fb.TextColor3 = Color3.new(1,1,1)
-				fb.TextScaled = true
-				fb.AutoButtonColor = true
-				Instance.new("UICorner", fb).CornerRadius = UDim.new(1,0)
-				fb.Visible = false
-				fb.ZIndex = 500
-				fb.Parent = parent
-				fb.MouseButton1Click:Connect(function()
-					pcall(function() if _G.ShowMain then _G.ShowMain() elseif Main and Main.Visible ~= nil then Main.Visible = true end end)
-					if Icon then Icon.Visible = false end
-					fb.Visible = false
-				end)
-			end
-			return fb
-		end
-
-		local parent = Icon.Parent or UI or CoreGui
-		local fb = createFallback(parent)
-
-		-- attempt preload with retries
-		local ok_preload = false
-		for i=1,3 do
-			local ok, err = pcall(function() ContentProvider:PreloadAsync({Icon}) end)
-			if ok then ok_preload = true break end
-			task.wait(0.6)
-		end
-		if ok_preload then
-			print("CrnXAi: Icon image preloaded successfully")
-			if fb and fb.Parent then pcall(function() fb:Destroy() end) end
-			Icon.Visible = true
-		else
-			warn("CrnXAi: Icon image failed to preload")
-			pcall(Notify, "CornelloTeam", "Gagal memuat ikon, menampilkan fallback")
-			if fb then fb.Visible = true end
-			Icon.Visible = false
-		end
-	end
-	-- initial check (async to avoid blocking)
-	task.spawn(ensureIconLoaded)
-	-- re-check when Image property changes
-	Icon:GetPropertyChangedSignal("Image"):Connect(function()
-		task.spawn(ensureIconLoaded)
-	end)
-	-- also try to create an alternate icon directly in CoreGui in case UI parent is blocked
+	-- ensure icon is visible and interactive (no external image logic)
 	pcall(function()
-		if CoreGui and not CoreGui:FindFirstChild("CornelloIconAlt") then
-			local alt = Instance.new("ImageButton")
-			alt.Name = "CornelloIconAlt"
-			alt.Size = Icon.Size
-			alt.Position = Icon.Position
-			alt.BackgroundTransparency = 1
-			alt.Image = Icon.Image
-			alt.Parent = CoreGui
-			Instance.new("UICorner", alt).CornerRadius = UDim.new(1,0)
-			alt.MouseButton1Click:Connect(function()
-				local ok, _ = pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
-				if Icon then Icon.Visible = false end
-				alt.Visible = false
+		if Icon then
+			Icon.Visible = true
+			-- hover and click handled earlier; ensure small pulse to attract attention
+			pcall(function()
+				local tw = TweenService:Create(Icon, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {BackgroundTransparency = 0.04})
+				tw:Play()
 			end)
 		end
-	end)
-end
+		-- create an alternate clickable icon in CoreGui for restricted environments
+		pcall(function()
+			if CoreGui and not CoreGui:FindFirstChild("CornelloIconAlt") then
+				local alt = Instance.new("TextButton")
+				alt.Name = "CornelloIconAlt"
+				alt.Size = Icon.Size
+				alt.Position = Icon.Position
+				alt.BackgroundColor3 = Color3.fromRGB(28,24,34)
+				Instance.new("UICorner", alt).CornerRadius = UDim.new(1,0)
+				local al = Instance.new("TextLabel", alt)
+				al.Size = UDim2.fromScale(1,1)
+				al.BackgroundTransparency = 1
+				al.Text = "C"
+				al.Font = Enum.Font.GothamBlack
+				al.TextScaled = true
+				al.TextColor3 = Color3.new(1,1,1)
+				alt.Parent = CoreGui
+				alt.ZIndex = 1000
+				alt.MouseButton1Click:Connect(function()
+					pcall(showMain)
+					if Icon then Icon.Visible = false end
+					alt.Visible = false
+				end)
+			end
+		end)
+	end
 if not ok_icon or not Icon then
 	warn("CrnXAi: failed to create Icon")
 	pcall(Notify, "CornelloTeam", "Gagal membuat ikon UI")
@@ -619,65 +589,57 @@ if not ok_icon or not Icon then
 else
 	print("CrnXAi: Icon created")
 	pcall(Notify, "CornelloTeam", "Ikon UI dibuat")
-	-- Preload image to detect load failure and create fallback if needed
-	local ContentProvider = game:GetService("ContentProvider")
-	local function ensureIconLoaded()
-		local function createFallbackInUI()
-			local fb = UI:FindFirstChild("CornelloIconFallback")
-			if not fb then
-				fb = Instance.new("TextButton")
-				fb.Name = "CornelloIconFallback"
-				fb.Size = Icon.Size
-				fb.Position = Icon.Position
-				fb.AnchorPoint = Icon.AnchorPoint or Vector2.new(0,0)
-				fb.BackgroundColor3 = Color3.fromRGB(48,48,58)
-			fb.Text = ((Config.IconBackup ~= "" ) and Config.IconBackup) or "C"
-				fb.Font = Enum.Font.GothamBold
-				fb.TextSize = 28
-				fb.TextScaled = true
-				fb.TextColor3 = Color3.new(1,1,1)
-				fb.AutoButtonColor = true
-				Instance.new("UICorner", fb).CornerRadius = UDim.new(1,0)
-				fb.Visible = false
-				fb.Parent = UI
-				fb.ZIndex = 500
-				fb.MouseButton1Click:Connect(function()
-					pcall(function() if _G.ShowMain then _G.ShowMain() elseif Main and Main.Visible ~= nil then Main.Visible = true end end)
-					if Icon then Icon.Visible = false end
-					fb.Visible = false
-				end)
-			end
-			return fb
-		end
-
-		local fb = createFallbackInUI()
-
-		local ok_preload = false
-		for i=1,3 do
-			local ok, err = pcall(function() ContentProvider:PreloadAsync({Icon}) end)
-			if ok then ok_preload = true break end
-			task.wait(0.6)
-		end
-		if ok_preload then
-			print("CrnXAi: Icon image preloaded successfully")
-			if fb and fb.Parent then pcall(function() fb:Destroy() end) end
-			Icon.Visible = true
-		else
-			warn("CrnXAi: Icon image failed to preload")
-			pcall(Notify, "CornelloTeam", "Gagal memuat ikon, menampilkan fallback")
-			if fb then fb.Visible = true end
-			Icon.Visible = false
-		end
-	end
-	-- initial check (async to avoid blocking)
-	task.spawn(ensureIconLoaded)
-	-- expose a global reload helper so Apply button can trigger a fresh check
-	_G.ReloadIcon = function() task.spawn(ensureIconLoaded) end
-	-- re-check when Image property changes
-	Icon:GetPropertyChangedSignal("Image"):Connect(function()
-		task.spawn(ensureIconLoaded)
+	-- show and animate icon (no external image logic)
+	Icon.Visible = true
+	pcall(function()
+		local tw = TweenService:Create(Icon, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {BackgroundTransparency = 0.04})
+		tw:Play()
 	end)
+	-- create an alternate clickable icon in CoreGui for restricted environments
+	pcall(function()
+		if CoreGui and not CoreGui:FindFirstChild("CornelloIconAlt") then
+			local alt = Instance.new("TextButton")
+			alt.Name = "CornelloIconAlt"
+			alt.Size = Icon.Size
+			alt.Position = Icon.Position
+			alt.BackgroundColor3 = Color3.fromRGB(28,24,34)
+			Instance.new("UICorner", alt).CornerRadius = UDim.new(1,0)
+			local al = Instance.new("TextLabel", alt)
+			al.Size = UDim2.fromScale(1,1)
+			al.BackgroundTransparency = 1
+			al.Text = "C"
+			al.Font = Enum.Font.GothamBlack
+			al.TextScaled = true
+			al.TextColor3 = Color3.new(1,1,1)
+			alt.Parent = CoreGui
+			alt.ZIndex = 1000
+			alt.MouseButton1Click:Connect(function()
+				pcall(showMain)
+				if Icon then Icon.Visible = false end
+				alt.Visible = false
+			end)
+		end
+	end)
+end
 
+-- Ensure existing fallback buttons call the same animated show
+pcall(function()
+	local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
+	if fb then
+		fb.MouseButton1Click:Connect(function()
+			pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
+			if Icon then Icon.Visible = false end
+			fb.Visible = false
+		end)
+	end
+	local alt = CoreGui:FindFirstChild("CornelloIconAlt") or UI:FindFirstChild("CornelloIconAlt")
+	if alt then
+		alt.MouseButton1Click:Connect(function()
+			pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
+			if Icon then Icon.Visible = false end
+			alt.Visible = false
+		end)
+	end
 	-- visibility sanity check: if neither icon nor fallback visible after 3s, show big debug message
 	task.delay(3, function()
 		local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
@@ -687,8 +649,8 @@ else
 			pcall(function()
 				local overlay = Instance.new("Frame", UI)
 				overlay.Name = "CrnXAi_IconForce"
-				overlay.Size = UDim2.fromScale(0.25, 0.08)
-				overlay.Position = UDim2.fromScale(0.02, 0.02)
+				overlay.Size = UDim2.fromScale(0.25,0.08)
+				overlay.Position = UDim2.fromScale(0.02,0.02)
 				overlay.BackgroundColor3 = Color3.fromRGB(200,50,50)
 				Instance.new("UICorner", overlay).CornerRadius = UDim.new(0,6)
 				local txt = Instance.new("TextLabel", overlay)
@@ -700,7 +662,8 @@ else
 				Task = task.delay(6, function() if overlay and overlay.Parent then overlay:Destroy() end end)
 			end)
 		end
-	end)end
+	end)
+end
 
 -- ================= MAIN =================
 local Main = Instance.new("Frame",UI)
@@ -928,45 +891,17 @@ local function UtilityPanel()
 		Notify("Tap","Test tap dikirim")
 	end)
 
-	-- ICON SETTINGS
+	-- ICON SETTINGS (statis)
 	Label("ICON")
-	Input("Icon Image URL", Config.IconImage, function(v) Config.IconImage = v SaveConfig() end)
-	Input("Fallback Text", Config.IconBackup, function(v) Config.IconBackup = v SaveConfig() end)
-
-	local applyIconBtn = Instance.new("TextButton",Content)
-	applyIconBtn.Size = UDim2.new(1,-20,0,40)
-	applyIconBtn.Text = "APPLY ICON"
-	applyIconBtn.Font = Enum.Font.GothamBold
-	applyIconBtn.TextSize = 14
-	applyIconBtn.TextColor3 = Color3.new(1,1,1)
-	applyIconBtn.BackgroundColor3 = Color3.fromRGB(70,130,90)
-	Instance.new("UICorner",applyIconBtn)
-	applyIconBtn.MouseButton1Click:Connect(function()
-		if Config.IconImage and Config.IconImage ~= "" then
-			if Icon then Icon.Image = Config.IconImage end
-			SaveConfig()
-			Notify("Icon","Mencoba memuat ikon baru")
-			pcall(function() if _G.ReloadIcon then _G.ReloadIcon() end end)
-		else
-			Notify("Icon","URL ikon kosong")
-		end
-	end)
-
-	local resetIconBtn = Instance.new("TextButton",Content)
-	resetIconBtn.Size = UDim2.new(1,-20,0,40)
-	resetIconBtn.Text = "RESET ICON"
-	resetIconBtn.Font = Enum.Font.GothamBold
-	resetIconBtn.TextSize = 14
-	resetIconBtn.TextColor3 = Color3.new(1,1,1)
-	resetIconBtn.BackgroundColor3 = Color3.fromRGB(120,80,80)
-	Instance.new("UICorner",resetIconBtn)
-	resetIconBtn.MouseButton1Click:Connect(function()
-		Config.IconImage = DefaultConfig.IconImage
-		Config.IconBackup = "C"
-		if Icon then Icon.Image = Config.IconImage end
-		SaveConfig()
-		Notify("Icon","Ikon di-reset ke default")
-	end)
+	Label("Ikon sekarang st aset: logo 'C' statis. Tidak ada dukungan URL.")
+	local info = Instance.new("TextLabel", Content)
+	info.Size = UDim2.new(1,-20,0,30)
+	info.Text = "Logo 'C' akan digunakan sebagai ikon utama. Anda bisa menyesuaikan warna di kode jika perlu."
+	info.Font = Enum.Font.Gotham
+	info.TextSize = 12
+	info.TextColor3 = Color3.fromRGB(200,200,200)
+	info.BackgroundTransparency = 1
+	Instance.new("UICorner", info)
 end
 
 local function FeaturePanel()
