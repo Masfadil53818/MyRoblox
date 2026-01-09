@@ -35,26 +35,7 @@ jobs:
           fi
 
           # build JSON payload safely using Python to ensure proper escaping
-          PAYLOAD=$(python - <<PY
-import os, json
-payload = {
-  "username": "CornelloTeam",
-  "embeds": [{
-    "title": f"Update Script — CornelloTeam v{os.getenv('VERSION','unknown')}",
-    "description": os.getenv('CHANGELOG','No changelog provided'),
-    "color": 5763714,
-    "fields": [
-      {"name":"Version","value": os.getenv('VERSION','unknown'), "inline": True},
-      {"name":"Changelog","value": os.getenv('CHANGELOG','').strip() or 'No changelog', "inline": False}
-    ],
-    "thumbnail": { "url": "https://ibb.co.com/9mxLgNg7" },
-    "footer": {"text":"Public Update • CornelloTeam"},
-    "timestamp": os.getenv('TIMESTAMP')
-  }]
-}
-print(json.dumps(payload))
-PY
-)
+          PAYLOAD=$(python -c 'import os, json; payload = {"username": "CornelloTeam", "embeds": [{"title": f"Update Script — CornelloTeam v{os.getenv("VERSION","unknown")}", "description": os.getenv("CHANGELOG","No changelog provided"), "color": 5763714, "fields": [{"name":"Version","value": os.getenv("VERSION","unknown"), "inline": True}, {"name":"Changelog","value": os.getenv("CHANGELOG","").strip() or "No changelog", "inline": False}], "thumbnail": {"url": "https://i.ibb.co/9mxLgNg7/thumbnail.png"}, "footer": {"text": "Public Update • CornelloTeam"}, "timestamp": os.getenv("TIMESTAMP")}]} ; print(json.dumps(payload))')
 
           # DEBUG: print payload for inspection (will not reveal webhook)
           echo "PAYLOAD: $PAYLOAD"
