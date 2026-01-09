@@ -13,6 +13,7 @@ local StarterGui = game:GetService("StarterGui")
 local GuiService = game:GetService("GuiService")
 local VirtualInput = game:GetService("VirtualInputManager")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local Player = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
@@ -482,7 +483,7 @@ if not ok_icon or not Icon then
 		fb.AutoButtonColor = true
 		fb.Parent = CoreGui
 		fb.MouseButton1Click:Connect(function()
-			if Main and Main.Visible ~= nil then Main.Visible = true end
+			local ok, _ = pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
 			if Icon then Icon.Visible = false end
 			fb.Visible = false
 		end)
@@ -551,7 +552,7 @@ else
 			alt.Parent = CoreGui
 			Instance.new("UICorner", alt).CornerRadius = UDim.new(1,0)
 			alt.MouseButton1Click:Connect(function()
-				if Main and Main.Visible ~= nil then Main.Visible = true end
+				local ok, _ = pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
 				if Icon then Icon.Visible = false end
 				alt.Visible = false
 			end)
@@ -634,14 +635,74 @@ local Main = Instance.new("Frame",UI)
 Main.Size = UDim2.fromScale(0.65,0.75)
 Main.Position = UDim2.fromScale(0.175,0.12)
 Main.BackgroundColor3 = Color3.fromRGB(22,22,30)
+Main.BackgroundTransparency = 1
 Main.Visible = false
 Main.Draggable = true
 Instance.new("UICorner",Main).CornerRadius = UDim.new(0,16)
+-- modern accents
+local stroke = Instance.new("UIStroke", Main)
+stroke.Color = Color3.fromRGB(80,60,120)
+stroke.Thickness = 1
+local grad = Instance.new("UIGradient", Main)
+grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.fromRGB(28,24,38)), ColorSequenceKeypoint.new(1, Color3.fromRGB(18,18,26))}
 
-Icon.MouseButton1Click:Connect(function()
+-- animation helpers
+local function tweenObject(inst, props, dur, style, dir)
+	local info = TweenInfo.new(dur or 0.28, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out)
+	local tw = TweenService:Create(inst, info, props)
+	tw:Play()
+	return tw
+end
+
+local mainTargetPos = Main.Position
+Main.Position = UDim2.new(mainTargetPos.X.Scale, mainTargetPos.X.Offset, mainTargetPos.Y.Scale - 0.06, mainTargetPos.Y.Offset)
+
+local function showMain()
 	Main.Visible = true
-	Icon.Visible = false
+	tweenObject(Main, {BackgroundTransparency = 0, Position = mainTargetPos}, 0.36, Enum.EasingStyle.Back)
+	if Icon then
+		tweenObject(Icon, {Size = UDim2.fromScale(0.07,0.07)}, 0.12)
+		task.delay(0.14, function() Icon.Visible = false end)
+	end
+end
+
+local function hideMain()
+	local upPos = UDim2.new(mainTargetPos.X.Scale, mainTargetPos.X.Offset, mainTargetPos.Y.Scale - 0.06, mainTargetPos.Y.Offset)
+	tweenObject(Main, {BackgroundTransparency = 1, Position = upPos}, 0.22, Enum.EasingStyle.Quad)
+	task.delay(0.22, function()
+		Main.Visible = false
+		if Icon then Icon.Visible = true tweenObject(Icon, {Size = UDim2.fromScale(0.09,0.09)}, 0.22, Enum.EasingStyle.Elastic) end
+	end)
+end
+
+_G.ShowMain = showMain
+_G.HideMain = hideMain
+
+-- Ensure existing fallback buttons call the same animated show
+pcall(function()
+	local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
+	if fb then
+		fb.MouseButton1Click:Connect(function()
+			pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
+			if Icon then Icon.Visible = false end
+			fb.Visible = false
+		end)
+	end
+	local alt = CoreGui:FindFirstChild("CornelloIconAlt") or UI:FindFirstChild("CornelloIconAlt")
+	if alt then
+		alt.MouseButton1Click:Connect(function()
+			pcall(function() if _G.ShowMain then _G.ShowMain() else if Main and Main.Visible ~= nil then Main.Visible = true end end end)
+			if Icon then Icon.Visible = false end
+			alt.Visible = false
+		end)
+	end
 end)
+
+if Icon then
+	Icon.MouseEnter:Connect(function() pcall(function() tweenObject(Icon, {Size = UDim2.fromScale(0.10,0.10)}, 0.12) end) end)
+	Icon.MouseLeave:Connect(function() pcall(function() tweenObject(Icon, {Size = UDim2.fromScale(0.09,0.09)}, 0.12) end) end)
+	Icon.MouseButton1Click:Connect(function() pcall(showMain) end)
+end
 
 -- ================= HEADER =================
 local Header = Instance.new("TextButton",Main)
@@ -652,8 +713,7 @@ Header.TextSize = 14
 Header.TextColor3 = Color3.new(1,1,1)
 Header.BackgroundTransparency = 1
 Header.MouseButton1Click:Connect(function()
-	Main.Visible = false
-	Icon.Visible = true
+	pcall(hideMain)
 end)
 
 -- ================= SIDEBAR =================
