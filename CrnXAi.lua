@@ -495,6 +495,25 @@ fb.Text = ((Config.IconBackup ~= "" ) and Config.IconBackup) or "C"
 else
 	print("CrnXAi: Icon created (parent=" .. (Icon.Parent and Icon.Parent.Name or "nil") .. ")")
 	pcall(Notify, "CornelloTeam", "Ikon UI dibuat")
+	-- enforce visibility settings and diagnostics
+	Icon.ZIndex = 1000
+	Icon.Visible = false -- will be shown after preload succeeds
+	print("CrnXAi: Icon.Image =", Icon.Image)
+	print("CrnXAi: Icon parent =", Icon.Parent and Icon.Parent:GetFullName())
+	-- short on-screen debug label showing current image
+	pcall(function()
+		local d = Instance.new("TextLabel", UI)
+		d.Name = "CrnXAi_IconDebug"
+		d.Size = UDim2.fromScale(0.2,0.04)
+		d.Position = Icon.Position + UDim2.fromScale(0, -0.06)
+		d.BackgroundColor3 = Color3.fromRGB(20,20,30)
+		d.TextColor3 = Color3.new(1,1,1)
+		d.Font = Enum.Font.Gotham
+		d.TextSize = 12
+		d.Text = "Icon: " .. tostring(Icon.Image)
+		Instance.new("UICorner", d).CornerRadius = UDim.new(0,6)
+		task.delay(6, function() if d and d.Parent then d:Destroy() end end)
+	end)
 	-- Preload image to detect load failure and create fallback if needed
 	local ContentProvider = game:GetService("ContentProvider")
 	local function ensureIconLoaded()
@@ -652,11 +671,36 @@ else
 	end
 	-- initial check (async to avoid blocking)
 	task.spawn(ensureIconLoaded)
+	-- expose a global reload helper so Apply button can trigger a fresh check
+	_G.ReloadIcon = function() task.spawn(ensureIconLoaded) end
 	-- re-check when Image property changes
 	Icon:GetPropertyChangedSignal("Image"):Connect(function()
 		task.spawn(ensureIconLoaded)
 	end)
-end
+
+	-- visibility sanity check: if neither icon nor fallback visible after 3s, show big debug message
+	task.delay(3, function()
+		local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
+		if (not Icon or not Icon.Parent or not Icon.Visible) and (not fb or not fb.Parent or not fb.Visible) then
+			warn("CrnXAi: Neither icon nor fallback is visible — creating forced overlay")
+			pcall(Notify, "CornelloTeam", "Icon tidak tampil — menampilkan overlay debug")
+			pcall(function()
+				local overlay = Instance.new("Frame", UI)
+				overlay.Name = "CrnXAi_IconForce"
+				overlay.Size = UDim2.fromScale(0.25, 0.08)
+				overlay.Position = UDim2.fromScale(0.02, 0.02)
+				overlay.BackgroundColor3 = Color3.fromRGB(200,50,50)
+				Instance.new("UICorner", overlay).CornerRadius = UDim.new(0,6)
+				local txt = Instance.new("TextLabel", overlay)
+				txt.Size = UDim2.fromScale(1,1)
+				txt.BackgroundTransparency = 1
+				txt.Text = "CrnXAi: ICON MISSING"
+				txt.Font = Enum.Font.GothamBold
+				txt.TextColor3 = Color3.new(1,1,1)
+				Task = task.delay(6, function() if overlay and overlay.Parent then overlay:Destroy() end end)
+			end)
+		end
+	end)end
 
 -- ================= MAIN =================
 local Main = Instance.new("Frame",UI)
@@ -817,23 +861,9 @@ end
 local function UtilityPanel()
 	Clear()
 	Label("UTILITY")
-	Input("Discord ID",Config.DiscordID,function(v) Config.DiscordID=v end)
-	Input("Webhook URL", "", function(v)
-		if v ~= "" then
-			table.insert(Config.Webhooks,v)
-			Notify("Webhook","Ditambahkan")
-		end
-	end)
+	-- General utility settings live here (icon, tap settings etc.)
+	-- Webhook/notify settings moved to the NOTIFY panel for clarity
 
-	local testBtn = Instance.new("TextButton",Content)
-	testBtn.Size = UDim2.new(1,-20,0,40)
-	testBtn.Text = "TEST WEBHOOK"
-	testBtn.Font = Enum.Font.GothamBold
-	testBtn.TextSize = 14
-	testBtn.TextColor3 = Color3.new(1,1,1)
-	testBtn.BackgroundColor3 = Color3.fromRGB(70,130,90)
-	Instance.new("UICorner",testBtn)
-	testBtn.MouseButton1Click:Connect(TestWebhook)
 
 	Toggle("AutoSave",Config.AutoSave,function(v) Config.AutoSave=v end)
 	Toggle("AutoExecute",Config.AutoExecute,function(v)
@@ -916,6 +946,7 @@ local function UtilityPanel()
 			if Icon then Icon.Image = Config.IconImage end
 			SaveConfig()
 			Notify("Icon","Mencoba memuat ikon baru")
+			pcall(function() if _G.ReloadIcon then _G.ReloadIcon() end end)
 		else
 			Notify("Icon","URL ikon kosong")
 		end
@@ -955,10 +986,97 @@ end
 local function NotifyPanel()
 	Clear()
 	Label("NOTIFY")
-	Toggle("Discord Notify",Config.Notify,function(v) Config.Notify=v end)
-	Toggle("Safe Mode",Config.SafeMode,function(v) Config.SafeMode=v end)
+	Toggle("Discord Notify",Config.Notify,function(v) Config.Notify=v SaveConfig() end)
+	Toggle("Safe Mode",Config.SafeMode,function(v) Config.SafeMode=v SaveConfig() end)
 	Label("Reconnect Count: "..Config.ReconnectCount)
 	Label("Last Disconnect: "..Config.LastDisconnect)
+
+	-- Discord settings & webhook management
+	Label("DISCORD")
+	Input("Discord ID", Config.DiscordID, function(v) Config.DiscordID = v SaveConfig() end)
+
+	local newWebhook = ""
+	local webhookRow = Instance.new("Frame", Content)
+	webhookRow.Size = UDim2.new(1, -20, 0, 40)
+	webhookRow.BackgroundTransparency = 1
+	local whInput = Instance.new("TextBox", webhookRow)
+	whInput.Size = UDim2.new(1, -130, 1, 0)
+	whInput.PlaceholderText = "Webhook URL"
+	whInput.Text = ""
+	whInput.Font = Enum.Font.Gotham
+	whInput.TextSize = 14
+	whInput.TextColor3 = Color3.new(1,1,1)
+	whInput.BackgroundColor3 = Color3.fromRGB(50,50,70)
+	Instance.new("UICorner", whInput)
+	whInput:GetPropertyChangedSignal("Text"):Connect(function() newWebhook = whInput.Text end)
+
+	local addBtn = Instance.new("TextButton", webhookRow)
+	addBtn.Size = UDim2.new(0,120,1,0)
+	addBtn.Position = UDim2.new(1, -10, 0, 0)
+	addBtn.AnchorPoint = Vector2.new(1,0)
+	addBtn.Text = "ADD WEBHOOK"
+	addBtn.Font = Enum.Font.GothamBold
+	addBtn.TextSize = 14
+	addBtn.TextColor3 = Color3.new(1,1,1)
+	addBtn.BackgroundColor3 = Color3.fromRGB(70,130,90)
+	Instance.new("UICorner", addBtn)
+	addBtn.MouseButton1Click:Connect(function()
+		if newWebhook and newWebhook ~= "" then
+			table.insert(Config.Webhooks, newWebhook)
+			SaveConfig()
+			Notify("Webhook","Ditambahkan")
+			NotifyPanel()
+		end
+	end)
+
+	-- list existing webhooks
+	local whList = Instance.new("Frame", Content)
+	whList.Size = UDim2.new(1, -20, 0, 0)
+	whList.BackgroundTransparency = 1
+	local listLayout = Instance.new("UIListLayout", whList)
+	listLayout.Padding = UDim.new(0,6)
+
+	for i,url in ipairs(Config.Webhooks) do
+		local row = Instance.new("Frame", whList)
+		row.Size = UDim2.new(1, 0, 0, 34)
+		row.BackgroundTransparency = 1
+		local lbl = Instance.new("TextLabel", row)
+		lbl.Size = UDim2.new(1, -80, 1, 0)
+		lbl.Text = url
+		lbl.Font = Enum.Font.Gotham
+		lbl.TextSize = 12
+		lbl.TextColor3 = Color3.new(1,1,1)
+		lbl.BackgroundTransparency = 1
+		lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+		local del = Instance.new("TextButton", row)
+		del.Size = UDim2.new(0,70,1,0)
+		del.Position = UDim2.new(1,-70,0,0)
+		del.AnchorPoint = Vector2.new(1,0)
+		del.Text = "REMOVE"
+		del.Font = Enum.Font.GothamBold
+		del.TextSize = 12
+		del.TextColor3 = Color3.new(1,1,1)
+		del.BackgroundColor3 = Color3.fromRGB(120,60,60)
+		Instance.new("UICorner", del)
+		del.MouseButton1Click:Connect(function()
+			table.remove(Config.Webhooks, i)
+			SaveConfig()
+			Notify("Webhook","Dihapus")
+			NotifyPanel()
+		end)
+	end
+
+	-- test button
+	local testBtn2 = Instance.new("TextButton",Content)
+	testBtn2.Size = UDim2.new(1,-20,0,40)
+	testBtn2.Text = "TEST WEBHOOK"
+	testBtn2.Font = Enum.Font.GothamBold
+	testBtn2.TextSize = 14
+	testBtn2.TextColor3 = Color3.new(1,1,1)
+	testBtn2.BackgroundColor3 = Color3.fromRGB(70,130,90)
+	Instance.new("UICorner",testBtn2)
+	testBtn2.MouseButton1Click:Connect(TestWebhook)
 end
 
 local function SideButton(text,callback,y)
