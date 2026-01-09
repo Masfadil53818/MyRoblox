@@ -612,8 +612,30 @@ GuiService.ErrorMessageChanged:Connect(function(msg)
 	TryReconnect(msg)
 end)
 
-game:BindToClose(function()
-	SendWebhook("Player Left")
-end)
+local RunService = game:GetService("RunService")
+-- BindToClose is only available on server-side scripts. For client, use ancestry change to detect leave.
+if RunService:IsServer() then
+	game:BindToClose(function()
+		pcall(SendWebhook, "Player Left")
+	end)
+else
+	-- client fallback: when LocalPlayer is removed from the game hierarchy, send webhook
+	Player.AncestryChanged:Connect(function(child, parent)
+		if not parent then
+			pcall(SendWebhook, "Player Left")
+		end
+	end)
+end
 
 Notify("CornelloTeam","v3.4.1 Loaded. AutoExec waras. Webhook bisa dites.")
+
+-- Helper: play sound safely (asset may be private/unapproved for requester)
+local function SafePlaySound(assetId)
+	pcall(function()
+		local s = Instance.new("Sound")
+		s.SoundId = "rbxassetid://"..tostring(assetId)
+		s.Parent = workspace
+		s:Play()
+		game:GetService("Debris"):AddItem(s, 5)
+	end)
+end
