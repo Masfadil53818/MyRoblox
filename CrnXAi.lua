@@ -370,22 +370,48 @@ end)
 
 -- ================= UI ROOT =================
 local ok_ui, UI = pcall(function()
-	local s = Instance.new("ScreenGui", CoreGui)
-	s.Name = "CornelloTeamUI"
-	s.ResetOnSpawn = false
-	return s
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "CornelloTeamUI"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 999 -- ensure on top
+	local parentGui = nil
+	local ok_pg, pg = pcall(function() return Player:FindFirstChild("PlayerGui") end)
+	if ok_pg and pg then
+		parentGui = pg
+	else
+		-- fallback to CoreGui if PlayerGui unavailable
+		parentGui = CoreGui
+	end
+	gui.Parent = parentGui
+	return gui
 end)
 if not ok_ui or not UI then
 	warn("CrnXAi: failed to create UI root")
 	pcall(Notify, "CornelloTeam", "Gagal membuat UI root")
 	return
 end
-print("CrnXAi: UI root created")
+print("CrnXAi: UI root created (parent=" .. (UI.Parent and UI.Parent.Name or "nil") .. ")")
 pcall(Notify, "CornelloTeam", "UI root dibuat")
+-- temporary on-screen debug overlay so we can see the UI is present
+local ok_debug = pcall(function()
+	local dbg = Instance.new("TextLabel", UI)
+	dbg.Name = "CrnXAiDebugOverlay"
+	dbg.Size = UDim2.fromScale(0.4, 0.06)
+	dbg.Position = UDim2.fromScale(0.3, 0.01)
+	dbg.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+	dbg.TextColor3 = Color3.new(1,1,1)
+	dbg.Font = Enum.Font.GothamBold
+	dbg.TextSize = 20
+	dbg.Text = "CrnXAi DEBUG: UI loaded"
+	dbg.TextWrapped = true
+	dbg.BackgroundTransparency = 0.2
+	task.delay(8, function() if dbg and dbg.Parent then dbg:Destroy() end end)
+end)
+if not ok_debug then warn("CrnXAi: debug overlay failed") end
 
 -- ================= FLOAT ICON =================
 local ok_icon, Icon = pcall(function()
-	local b = Instance.new("ImageButton", UI)
+	local b = Instance.new("ImageButton")
 	b.Name = "CornelloIcon"
 	b.Size = UDim2.fromScale(0.09, 0.09)
 	b.Position = UDim2.fromScale(0.05, 0.45)
@@ -395,6 +421,8 @@ local ok_icon, Icon = pcall(function()
 	b.AutoButtonColor = true
 	b.Draggable = true
 	Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
+	b.Visible = true
+	b.Parent = UI
 	return b
 end)
 if not ok_icon or not Icon then
