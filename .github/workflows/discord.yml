@@ -11,18 +11,33 @@ jobs:
     steps:
       - name: Send message to Discord
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
         run: |
           # fail early with clear message when secret is not set
           if [ -z "$DISCORD_WEBHOOK" ]; then
-            echo "ERROR: DISCORD_WEBHOOK secret is not set. Please add it in Settings -> Secrets -> Actions.";
+            echo "ERROR: secret 'UPDATESCRIPT' is not set. Please add it in Settings -> Secrets -> Actions.";
             exit 1;
           fi
 
-          # Send message to Discord
-          curl -sS --fail -X POST \
+          # basic URL validation to catch obvious mistakes
+          if ! echo "$DISCORD_WEBHOOK" | grep -Eq "https?://(canary\.)?discord(app)?\.com/api/webhooks/"; then
+            echo "ERROR: secret 'UPDATESCRIPT' does not look like a Discord webhook URL.";
+            echo "Value: $DISCORD_WEBHOOK";
+            exit 1;
+          fi
+
+          # Send message to Discord and show HTTP status
+          HTTP_STATUS=$(curl -sS -w "%{http_code}" -o /dev/null -X POST \
             -H "Content-Type: application/json" \
             -d '{
               "username": "GitHub Actions",
               "content": "🚀 Push baru ke **${{ github.repository }}**\n👤 Oleh: **${{ github.actor }}**\n🌿 Branch: **${{ github.ref_name }}**"
-            }' "$DISCORD_WEBHOOK"
+            }' "$DISCORD_WEBHOOK")
+
+          echo "Discord webhook returned HTTP $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Discord notification sent successfully.";
+          else
+            echo "ERROR: Discord webhook returned non-success status $HTTP_STATUS";
+            exit 1;
+          fi
