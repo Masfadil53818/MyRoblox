@@ -20,7 +20,7 @@ local VERSION_URL = ("https://raw.githubusercontent.com/%s/%s/%s/version.txt")
 	:format(GITHUB_USER, GITHUB_REPO, BRANCH)
 
 -- GANTI GAMBAR DI SINI (bebas, asal https)
-local IMAGE_URL = "https://i.imgur.com/8Km9tLL.png"
+local IMAGE_URL = "https://ibb.co.com/9mxLgNg7"
 
 -- ================= UI =================
 local gui = Instance.new("ScreenGui")
