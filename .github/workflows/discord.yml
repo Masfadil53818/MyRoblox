@@ -56,6 +56,9 @@ print(json.dumps(payload))
 PY
 )
 
+          # DEBUG: print payload for inspection (will not reveal webhook)
+          echo "PAYLOAD: $PAYLOAD"
+
           # send and check HTTP status
           HTTP_STATUS=$(curl -sS -w "%{http_code}" -o /dev/null -X POST \
             -H "Content-Type: application/json" \
