@@ -13,7 +13,14 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          curl -X POST \
+          # fail early with clear message when secret is not set
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "ERROR: DISCORD_WEBHOOK secret is not set. Please add it in Settings -> Secrets -> Actions.";
+            exit 1;
+          fi
+
+          # Send message to Discord
+          curl -sS --fail -X POST \
             -H "Content-Type: application/json" \
             -d '{
               "username": "GitHub Actions",
