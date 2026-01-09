@@ -9,9 +9,17 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read version
+        run: echo "VERSION=$(cat version.txt | tr -d '\r')" >> $GITHUB_ENV
+
       - name: Send message to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
+          CHANGELOG: ${{ github.event.head_commit.message }}
+          TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
           # fail early with clear message when secret is not set
           if [ -z "$DISCORD_WEBHOOK" ]; then
@@ -26,25 +34,31 @@ jobs:
             exit 1;
           fi
 
-          # Send message to Discord and show HTTP status
+          # build JSON payload safely using Python to ensure proper escaping
+          PAYLOAD=$(python - <<PY
+import os, json
+payload = {
+  "username": "CornelloTeam",
+  "embeds": [{
+    "title": f"Update Script — CornelloTeam v{os.getenv('VERSION','unknown')}",
+    "description": os.getenv('CHANGELOG','No changelog provided'),
+    "color": 5763714,
+    "fields": [
+      {"name":"Version","value": os.getenv('VERSION','unknown'), "inline": True},
+      {"name":"Changelog","value": os.getenv('CHANGELOG','').strip() or 'No changelog', "inline": False}
+    ],
+    "footer": {"text":"Public Update • CornelloTeam"},
+    "timestamp": os.getenv('TIMESTAMP')
+  }]
+}
+print(json.dumps(payload))
+PY
+)
+
+          # send and check HTTP status
           HTTP_STATUS=$(curl -sS -w "%{http_code}" -o /dev/null -X POST \
             -H "Content-Type: application/json" \
-            -d '{
-              "username": "CornelloTeam",
-              "embeds": [{
-                "title": "Update Script — CornelloTeam",
-                "description": "Public release: Pembaruan script Roblox tersedia. Silakan cek repository untuk detail dan changelog.",
-                "color": 5763714,
-                "fields": [
-                  {"name":"Repository","value":"${{ github.repository }}","inline":true},
-                  {"name":"Branch","value":"${{ github.ref_name }}","inline":true},
-                  {"name":"Commit","value":"${{ github.sha }}","inline":false},
-                  {"name":"Message","value":"${{ github.event.head_commit.message }}","inline":false}
-                ],
-                "footer": {"text":"Public Update • CornelloTeam"},
-                "timestamp": "${{ github.event.head_commit.timestamp }}"
-              }]
-            }' "$DISCORD_WEBHOOK")
+            -d "$PAYLOAD" "$DISCORD_WEBHOOK")
 
           echo "Discord webhook returned HTTP $HTTP_STATUS"
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
