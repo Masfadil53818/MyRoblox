@@ -374,13 +374,19 @@ local ok_ui, UI = pcall(function()
 	gui.Name = "CornelloTeamUI"
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 999 -- ensure on top
+	-- try to parent to PlayerGui, wait briefly if needed
 	local parentGui = nil
 	local ok_pg, pg = pcall(function() return Player:FindFirstChild("PlayerGui") end)
 	if ok_pg and pg then
 		parentGui = pg
 	else
-		-- fallback to CoreGui if PlayerGui unavailable
-		parentGui = CoreGui
+		-- wait up to 5s for PlayerGui to appear
+		local ok_wait, pg2 = pcall(function() return Player:WaitForChild("PlayerGui", 5) end)
+		if ok_wait and pg2 then
+			parentGui = pg2
+		else
+			parentGui = CoreGui -- fallback, may be blocked
+		end
 	end
 	gui.Parent = parentGui
 	return gui
@@ -392,22 +398,55 @@ if not ok_ui or not UI then
 end
 print("CrnXAi: UI root created (parent=" .. (UI.Parent and UI.Parent.Name or "nil") .. ")")
 pcall(Notify, "CornelloTeam", "UI root dibuat")
--- temporary on-screen debug overlay so we can see the UI is present
-local ok_debug = pcall(function()
-	local dbg = Instance.new("TextLabel", UI)
-	dbg.Name = "CrnXAiDebugOverlay"
-	dbg.Size = UDim2.fromScale(0.4, 0.06)
-	dbg.Position = UDim2.fromScale(0.3, 0.01)
-	dbg.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-	dbg.TextColor3 = Color3.new(1,1,1)
-	dbg.Font = Enum.Font.GothamBold
-	dbg.TextSize = 20
-	dbg.Text = "CrnXAi DEBUG: UI loaded"
-	dbg.TextWrapped = true
-	dbg.BackgroundTransparency = 0.2
-	task.delay(8, function() if dbg and dbg.Parent then dbg:Destroy() end end)
+-- create a visible large test label to confirm visibility
+local ok_test = pcall(function()
+	local test = Instance.new("TextLabel")
+	test.Name = "CrnXAi_TEST_VISIBLE"
+	test.Size = UDim2.fromScale(0.5, 0.1)
+	test.Position = UDim2.fromScale(0.25, 0.45)
+	test.BackgroundColor3 = Color3.fromRGB(30,160,100)
+	test.TextColor3 = Color3.new(1,1,1)
+	test.Font = Enum.Font.GothamBold
+	test.TextSize = 26
+	test.Text = "CrnXAi: UI VISIBLE"
+	test.TextWrapped = true
+	test.Parent = UI
+	task.delay(6, function() if test and test.Parent then test:Destroy() end end)
 end)
-if not ok_debug then warn("CrnXAi: debug overlay failed") end
+if not ok_test then warn("CrnXAi: test label failed") end
+-- also create an alternate UI in CoreGui (if different) to maximize chance of display
+pcall(function()
+	if UI.Parent ~= CoreGui then
+		local alt = CoreGui:FindFirstChild("CornelloTeamUI_Alt")
+		if not alt then
+			alt = Instance.new("ScreenGui") alt.Name = "CornelloTeamUI_Alt" alt.ResetOnSpawn = false alt.DisplayOrder = 1000
+			alt.Parent = CoreGui
+			print("CrnXAi: Alt UI created in CoreGui")
+		end
+		-- small visible marker in alt too
+		if alt and not alt:FindFirstChild("CrnXAi_TEST_VISIBLE_ALT") then
+			local t2 = Instance.new("TextLabel", alt)
+			t2.Name = "CrnXAi_TEST_VISIBLE_ALT"
+			t2.Size = UDim2.fromScale(0.4, 0.06)
+			t2.Position = UDim2.fromScale(0.3, 0.01)
+			t2.BackgroundColor3 = Color3.fromRGB(160,40,80)
+			t2.TextColor3 = Color3.new(1,1,1)
+			t2.Font = Enum.Font.GothamBold
+			t2.TextSize = 18
+			t2.Text = "CrnXAi ALT: UI loaded"
+			task.delay(6, function() if t2 and t2.Parent then t2:Destroy() end end)
+		end
+	end
+end)
+-- diagnostic prints
+pcall(function()
+	print("CrnXAi: Player has PlayerGui?", Player:FindFirstChild("PlayerGui") ~= nil)
+	print("CrnXAi: UI parent name:", UI.Parent and UI.Parent.Name or "nil")
+	if UI.Parent then
+		print("CrnXAi: UI children:")
+		for i,v in ipairs(UI:GetChildren()) do print(" -", v.Name, v.ClassName) end
+	end
+end)
 
 -- ================= FLOAT ICON =================
 local ok_icon, Icon = pcall(function()
@@ -425,6 +464,100 @@ local ok_icon, Icon = pcall(function()
 	b.Parent = UI
 	return b
 end)
+if not ok_icon or not Icon then
+	warn("CrnXAi: failed to create Icon")
+	pcall(Notify, "CornelloTeam", "Gagal membuat ikon UI")
+	-- fallback icon in CoreGui (if allowed)
+	pcall(function()
+		local fb = Instance.new("TextButton")
+		fb.Name = "CornelloIconFallback"
+		fb.Size = UDim2.fromScale(0.09, 0.09)
+		fb.Position = UDim2.fromScale(0.05, 0.45)
+		fb.BackgroundColor3 = Color3.fromRGB(50,50,60)
+		fb.Text = "C"
+		fb.Font = Enum.Font.GothamBold
+		fb.TextSize = 28
+		fb.TextColor3 = Color3.new(1,1,1)
+		Instance.new("UICorner", fb).CornerRadius = UDim.new(1,0)
+		fb.AutoButtonColor = true
+		fb.Parent = CoreGui
+		fb.MouseButton1Click:Connect(function()
+			if Main and Main.Visible ~= nil then Main.Visible = true end
+			if Icon then Icon.Visible = false end
+			fb.Visible = false
+		end)
+	end)
+else
+	print("CrnXAi: Icon created (parent=" .. (Icon.Parent and Icon.Parent.Name or "nil") .. ")")
+	pcall(Notify, "CornelloTeam", "Ikon UI dibuat")
+	-- Preload image to detect load failure and create fallback if needed
+	local ContentProvider = game:GetService("ContentProvider")
+	local function ensureIconLoaded()
+		local ok_preload, err = pcall(function()
+			ContentProvider:PreloadAsync({Icon})
+		end)
+		if ok_preload then
+			print("CrnXAi: Icon image preloaded successfully")
+			-- remove fallback if any
+			local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
+			if fb then fb:Destroy() end
+			Icon.Visible = true
+		else
+			warn("CrnXAi: Icon image failed to preload:", err)
+			pcall(Notify, "CornelloTeam", "Gagal memuat ikon, menampilkan fallback")
+			-- create fallback (if not exists) in UI or CoreGui
+			local fb = UI:FindFirstChild("CornelloIconFallback") or CoreGui:FindFirstChild("CornelloIconFallback")
+			if not fb then
+				fb = Instance.new("TextButton")
+				fb.Name = "CornelloIconFallback"
+				fb.Size = Icon.Size
+				fb.Position = Icon.Position
+				fb.BackgroundColor3 = Color3.fromRGB(50,50,60)
+				fb.Text = "C"
+				fb.Font = Enum.Font.GothamBold
+				fb.TextSize = 28
+				fb.TextColor3 = Color3.new(1,1,1)
+				fb.AutoButtonColor = true
+				Instance.new("UICorner", fb).CornerRadius = UDim.new(1,0)
+				-- attach to same parent as Icon if possible
+				local parent = Icon.Parent or UI or CoreGui
+				fb.Parent = parent
+				fb.MouseButton1Click:Connect(function()
+					if Main and Main.Visible ~= nil then Main.Visible = true end
+					if Icon then Icon.Visible = false end
+					fb.Visible = false
+				end)
+			else
+				fb.Visible = true
+			end
+			Icon.Visible = false
+		end
+	end
+	-- initial check (async to avoid blocking)
+	task.spawn(ensureIconLoaded)
+	-- re-check when Image property changes
+	Icon:GetPropertyChangedSignal("Image"):Connect(function()
+		task.spawn(ensureIconLoaded)
+	end)
+	-- also try to create an alternate icon directly in CoreGui in case UI parent is blocked
+	pcall(function()
+		if CoreGui and not CoreGui:FindFirstChild("CornelloIconAlt") then
+			local alt = Instance.new("ImageButton")
+			alt.Name = "CornelloIconAlt"
+			alt.Size = Icon.Size
+			alt.Position = Icon.Position
+			alt.BackgroundTransparency = 1
+			alt.Image = Icon.Image
+			alt.Parent = CoreGui
+			Instance.new("UICorner", alt).CornerRadius = UDim.new(1,0)
+			alt.MouseButton1Click:Connect(function()
+				if Main and Main.Visible ~= nil then Main.Visible = true end
+				if Icon then Icon.Visible = false end
+				alt.Visible = false
+			end)
+		end
+	end)
+end
 if not ok_icon or not Icon then
 	warn("CrnXAi: failed to create Icon")
 	pcall(Notify, "CornelloTeam", "Gagal membuat ikon UI")
