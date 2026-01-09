@@ -208,25 +208,65 @@ local function TryReconnect(reason)
 end
 
 -- ================= BACKGROUND =================
+
+-- Helper: simulate a tap that works for mobile (touch) and PC (mouse) without affecting real mouse
+local function SimulateTapAtCenter()
+	local ok, camera = pcall(function() return workspace.CurrentCamera end)
+	if not ok or not camera then return end
+
+	local vx = camera.ViewportSize.X/2
+	local vy = camera.ViewportSize.Y/2
+
+	-- small jitter so taps don't always land on same pixel (reduce interaction with buttons)
+	local jx = math.random(-8,8)
+	local jy = math.random(-8,8)
+	vx = vx + jx
+	vy = vy + jy
+
+	pcall(function()
+		-- prefer touch event if available (some executors expose SendTouchEvent)
+		if VirtualInput and VirtualInput.SendTouchEvent then
+			VirtualInput:SendTouchEvent(true, vx, vy, 0)
+			task.wait(0.05)
+			VirtualInput:SendTouchEvent(false, vx, vy, 0)
+		else
+			-- fallback to mouse button event which many environments emulate as a tap on mobile
+			VirtualInput:SendMouseButtonEvent(vx, vy, 0, true, game, 0)
+			task.wait(0.05)
+			VirtualInput:SendMouseButtonEvent(vx, vy, 0, false, game, 0)
+		end
+	end)
+end
+
+-- seed random once
+pcall(function() math.randomseed(tick()) end)
+
+-- Anti-AFK: perform a gentle tap at center every interval, but skip if user is typing in a textbox
 task.spawn(function()
 	while task.wait(60) do
 		if Config.AntiAFK then
-			-- Tekan tombol 'E' sebagai aktivitas anti-AFK (tanpa memakai mouse)
-			VirtualInput:SendKeyEvent(true,Enum.KeyCode.E,false,game)
-			task.wait(0.1)
-			VirtualInput:SendKeyEvent(false,Enum.KeyCode.E,false,game)
+			local ok, focused = pcall(function() return UserInputService:GetFocusedTextBox() end)
+			if ok and focused then
+				-- user is typing; skip this tick
+			else
+				SimulateTapAtCenter()
+			end
 		end
 	end
 end)
 
+-- AutoClick: perform repeated taps at center using AutoClickDelay, skip if user is interacting with text input
 task.spawn(function()
 	while task.wait() do
 		if Config.AutoClick then
-			-- Ganti auto-click agar menggunakan keypress 'E' (tanpa mouse)
-			VirtualInput:SendKeyEvent(true,Enum.KeyCode.E,false,game)
-			task.wait(0.05)
-			VirtualInput:SendKeyEvent(false,Enum.KeyCode.E,false,game)
-			task.wait(Config.AutoClickDelay)
+			local ok, focused = pcall(function() return UserInputService:GetFocusedTextBox() end)
+			if ok and focused then
+				-- avoid interfering with typing
+				task.wait(0.25)
+			else
+				SimulateTapAtCenter()
+				task.wait(Config.AutoClickDelay)
+			end
 		else
 			task.wait(0.25)
 		end
