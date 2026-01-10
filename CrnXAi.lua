@@ -158,7 +158,7 @@ WebhookTab:AddButton({
 -- ======================
 if queue and getgenv().CornelloConfig.AutoExecute then
 	queue([[
-		loadstring(game:HttpGet("PUT_RAW_SCRIPT_URL_HERE"))()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Masfadil53818/MyRoblox/refs/heads/main/crnloader"))()
 	]])
 end
 
