@@ -19,33 +19,39 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
           CHANGELOG: ${{ github.event.head_commit.message }}
         run: |
-          ADD=$(printf "%s\n" "$CHANGELOG" | grep '^[+]' | sed 's/^[+] *//' || true)
-          CHG=$(printf "%s\n" "$CHANGELOG" | grep '^[-]' | sed 's/^[-] *//' || true)
-          FIX=$(printf "%s\n" "$CHANGELOG" | grep '^[/]' | sed 's%^/ *%%' || true)
+          python << 'EOF'
+          import os, json, subprocess
 
-          DESC="Version: $VERSION"
+          changelog = os.getenv("CHANGELOG","").splitlines()
 
-          if [ -n "$ADD" ]; then
-            DESC="$DESC\n\n[ + ] ADD\n\`\`\`\n$ADD\n\`\`\`"
-          fi
+          add = [l[1:].strip() for l in changelog if l.startswith("+")]
+          chg = [l[1:].strip() for l in changelog if l.startswith("-")]
+          fix = [l[1:].strip() for l in changelog if l.startswith("/")]
 
-          if [ -n "$CHG" ]; then
-            DESC="$DESC\n\n[ - ] CHANGE\n\`\`\`\n$CHG\n\`\`\`"
-          fi
+          desc = f"Version: {os.getenv('VERSION','unknown')}\n"
 
-          if [ -n "$FIX" ]; then
-            DESC="$DESC\n\n[ / ] FIX\n\`\`\`\n$FIX\n\`\`\`"
-          fi
+          if add:
+              desc += "\n[ + ] ADD\n```" + "\n".join(add) + "```"
+          if chg:
+              desc += "\n[ - ] CHANGE\n```" + "\n".join(chg) + "```"
+          if fix:
+              desc += "\n[ / ] FIX\n```" + "\n".join(fix) + "```"
 
-          curl -X POST "$DISCORD_WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"content\": \"Game Script Updated\",
-              \"embeds\": [{
-                \"description\": \"$DESC\",
-                \"color\": 3092790,
-                \"thumbnail\": {
-                  \"url\": \"https://ibb.co.com/9mxLgNg7\"
-                }
+          payload = {
+              "content": "Game Script Updated",
+              "embeds": [{
+                  "description": desc,
+                  "color": 3092790,
+                  "thumbnail": {
+                      "url": "https://i.ibb.co/9mxLgNg7/thumbnail.png"
+                  }
               }]
-            }"
+          }
+
+          subprocess.run([
+              "curl","-X","POST",
+              os.environ["DISCORD_WEBHOOK"],
+              "-H","Content-Type: application/json",
+              "-d", json.dumps(payload)
+          ])
+          EOF
