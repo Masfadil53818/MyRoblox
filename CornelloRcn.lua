@@ -5,7 +5,7 @@
 --==============================--
 -- VERSION
 --==============================--
-local VERSION = "v0.0.1 [BETA]"
+local VERSION = "v0.0.2 [BETA]"
 pcall(function()
     if isfile and isfile("version.txt") then
         VERSION = readfile("version.txt")
