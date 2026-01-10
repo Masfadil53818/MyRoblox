@@ -70,7 +70,7 @@ end)
 
 if Config.AutoExecute and queue_on_teleport then
     queue_on_teleport([[
-        loadstring(game:HttpGet("PASTE_RAW_URL_DISINI"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Masfadil53818/MyRoblox/refs/heads/main/CornelloRcn.lua"))()
     ]])
 end
 
