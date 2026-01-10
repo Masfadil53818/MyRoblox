@@ -21,4 +21,4 @@ jobs:
         run: |
           curl -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "{\"username\":\"Update Service\",\"content\":\"Game Script Updated\nVersion: $VERSION\n\n$CHANGELOG\"}"
+            -d "{\"username\":\"Update Service\",\"content\":\"Game Script Updated\nVersion: $VERSION\n\n[ + ] ADD\n\`\`\`\n$CHANGELOG\n\`\`\`\"}"
