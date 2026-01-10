@@ -7,7 +7,7 @@
 --==============================--
 local VERSION = "v0.0.1 [BETA]"
 pcall(function()
-    if isfile("version.txt") then
+    if isfile and isfile("version.txt") then
         VERSION = readfile("version.txt")
     end
 end)
@@ -21,6 +21,7 @@ local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
+local GuiService = game:GetService("GuiService")
 local LocalPlayer = Players.LocalPlayer
 
 --==============================--
@@ -38,7 +39,7 @@ local Config = {
 }
 
 pcall(function()
-    if isfile(CONFIG_FILE) then
+    if isfile and isfile(CONFIG_FILE) then
         Config = HttpService:JSONDecode(readfile(CONFIG_FILE))
     end
 end)
@@ -56,8 +57,10 @@ local function GetTime()
     return os.date("%d-%m-%Y"), os.date("%H:%M:%S")
 end
 
+local request = syn and syn.request or http_request or request
+
 local function SendWebhook(title, fields)
-    if not Config.WebhookEnabled or Config.WebhookURL == "" then return end
+    if not Config.WebhookEnabled or Config.WebhookURL == "" or not request then return end
 
     local date, time = GetTime()
     local data = {
@@ -70,7 +73,7 @@ local function SendWebhook(title, fields)
     }
 
     pcall(function()
-        syn.request({
+        request({
             Url = Config.WebhookURL,
             Method = "POST",
             Headers = {["Content-Type"] = "application/json"},
@@ -90,9 +93,9 @@ if Config.AntiAFK then
     end)
 end
 
-game:GetService("GuiService").ErrorMessageChanged:Connect(function(msg)
+GuiService.ErrorMessageChanged:Connect(function(msg)
     SendWebhook("Disconnect Detected", {
-        {name="Reason", value="```"..msg.."```"}
+        {name="Reason", value="```"..tostring(msg).."```"}
     })
 
     if Config.AutoReconnect then
@@ -101,17 +104,19 @@ game:GetService("GuiService").ErrorMessageChanged:Connect(function(msg)
     end
 end)
 
-if Config.AutoExecute then
+if Config.AutoExecute and queue_on_teleport then
     queue_on_teleport([[
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Masfadil53818/MyRoblox/main/CornelloRcn.lua"))()
+        loadstring(game:HttpGet("PASTE_RAW_URL_DISINI"))()
     ]])
 end
 
 --==============================--
 -- UI
 --==============================--
-local GUI = Instance.new("ScreenGui", CoreGui)
+local GUI = Instance.new("ScreenGui")
 GUI.Name = "CornelloTeamUI"
+GUI.ResetOnSpawn = false
+GUI.Parent = CoreGui
 
 local Main = Instance.new("Frame", GUI)
 Main.Size = UDim2.fromScale(0.35,0.45)
@@ -121,7 +126,6 @@ Main.BackgroundColor3 = Color3.fromRGB(20,20,25)
 Main.Active = true
 Main.Draggable = true
 Main.ClipsDescendants = true
-Main.BackgroundTransparency = 0
 
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0,16)
 
@@ -135,7 +139,7 @@ Title.Size = UDim2.new(1,-50,1,0)
 Title.Position = UDim2.new(0,15,0,0)
 Title.Text = "CornelloTeam  "..VERSION
 Title.TextColor3 = Color3.fromRGB(200,200,255)
-Title.TextXAlignment = Left
+Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
@@ -146,6 +150,7 @@ Minimize.Position = UDim2.new(1,-35,0.5,-15)
 Minimize.Text = "—"
 Minimize.BackgroundColor3 = Color3.fromRGB(50,50,60)
 Minimize.TextColor3 = Color3.new(1,1,1)
+Minimize.AutoButtonColor = false
 Instance.new("UICorner", Minimize).CornerRadius = UDim.new(1,0)
 
 -- BODY
@@ -157,7 +162,7 @@ Body.BackgroundTransparency = 1
 local Layout = Instance.new("UIListLayout", Body)
 Layout.Padding = UDim.new(0,10)
 
--- TOGGLE CREATOR
+-- TOGGLE
 local function CreateToggle(name, flag)
     local Holder = Instance.new("Frame", Body)
     Holder.Size = UDim2.new(1,-20,0,45)
@@ -170,8 +175,9 @@ local function CreateToggle(name, flag)
     Label.Text = name
     Label.TextColor3 = Color3.new(1,1,1)
     Label.BackgroundTransparency = 1
-    Label.TextXAlignment = Left
+    Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Font = Enum.Font.Gotham
+    Label.TextSize = 13
 
     local Toggle = Instance.new("Frame", Holder)
     Toggle.Size = UDim2.new(0,50,0,25)
@@ -185,18 +191,23 @@ local function CreateToggle(name, flag)
     Dot.BackgroundColor3 = Color3.new(1,1,1)
     Instance.new("UICorner", Dot).CornerRadius = UDim.new(1,0)
 
+    local function Click()
+        Config[flag] = not Config[flag]
+        SaveConfig()
+
+        TweenService:Create(Toggle,TweenInfo.new(0.25),{
+            BackgroundColor3 = Config[flag] and Color3.fromRGB(0,170,255) or Color3.fromRGB(70,70,70)
+        }):Play()
+
+        TweenService:Create(Dot,TweenInfo.new(0.25),{
+            Position = Config[flag] and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
+        }):Play()
+    end
+
     Holder.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            Config[flag] = not Config[flag]
-            SaveConfig()
-
-            TweenService:Create(Toggle,TweenInfo.new(0.25),{
-                BackgroundColor3 = Config[flag] and Color3.fromRGB(0,170,255) or Color3.fromRGB(70,70,70)
-            }):Play()
-
-            TweenService:Create(Dot,TweenInfo.new(0.25),{
-                Position = Config[flag] and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
-            }):Play()
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            Click()
         end
     end)
 end
@@ -215,6 +226,7 @@ WebhookBox.PlaceholderText = "Webhook URL"
 WebhookBox.Text = Config.WebhookURL
 WebhookBox.BackgroundColor3 = Color3.fromRGB(30,30,40)
 WebhookBox.TextColor3 = Color3.new(1,1,1)
+WebhookBox.ClearTextOnFocus = false
 Instance.new("UICorner", WebhookBox).CornerRadius = UDim.new(0,10)
 
 WebhookBox.FocusLost:Connect(function()
