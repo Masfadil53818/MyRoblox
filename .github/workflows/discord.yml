@@ -14,55 +14,11 @@ jobs:
       - name: Read version
         run: echo "VERSION=$(cat version.txt | tr -d '\r')" >> $GITHUB_ENV
 
-      - name: Send Discord update
+      - name: Send Discord message
         env:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
-          RAW_CHANGELOG: ${{ github.event.head_commit.message }}
+          CHANGELOG: ${{ github.event.head_commit.message }}
         run: |
-          python3 - <<PY
-import os, json, urllib.request
-
-raw = os.getenv("RAW_CHANGELOG","").strip().splitlines()
-
-add, chg, fix = [], [], []
-
-for l in raw:
-    l = l.strip()
-    if not l: continue
-    if l.startswith("+"):
-        add.append(l[1:].strip())
-    elif l.startswith("-"):
-        chg.append(l[1:].strip())
-    elif l.startswith("/"):
-        fix.append(l[1:].strip())
-    else:
-        chg.append(l)
-
-def block(name, sym, items):
-    if not items:
-        return ""
-    return "[ %s ] %s\n```%s```\n" % (sym, name, "\n".join(items))
-
-desc = (
-    block("ADD", "+", add) +
-    block("CHANGE", "-", chg) +
-    block("FIX", "/", fix)
-).strip()
-
-payload = {
-    "username": "Update Service",
-    "embeds": [{
-        "title": "Game Script Update v" + os.getenv("VERSION","unknown"),
-        "description": desc,
-        "color": 2829617
-    }]
-}
-
-req = urllib.request.Request(
-    os.getenv("DISCORD_WEBHOOK"),
-    data=json.dumps(payload).encode(),
-    headers={"Content-Type": "application/json"}
-)
-
-urllib.request.urlopen(req)
-PY
+          curl -X POST "$DISCORD_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"Update Service\",\"content\":\"Game Script Updated\nVersion: $VERSION\n\n$CHANGELOG\"}"
