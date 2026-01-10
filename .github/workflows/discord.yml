@@ -13,9 +13,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Read version
-        run: echo "VERSION=$(cat version.txt | tr -d '\r')" >> $GITHUB_ENV
+        run: |
+          echo "VERSION=$(tr -d '\r' < version.txt)" >> $GITHUB_ENV
 
       - name: Send stealth update to Discord
+        shell: bash
         env:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
           RAW_CHANGELOG: ${{ github.event.head_commit.message }}
@@ -26,21 +28,16 @@ jobs:
             exit 1
           fi
 
-          PAYLOAD=$(python - << 'EOF'
+          PAYLOAD=$(python3 <<EOF
 import os, json
 
-raw = os.getenv("RAW_CHANGELOG","").strip()
-
-# Split lines from commit message
+raw = os.getenv("RAW_CHANGELOG", "").strip()
 lines = [l.strip() for l in raw.splitlines() if l.strip()]
 
-# Fallback if commit message is one line
 if not lines:
     lines = ["minor internal update"]
 
-add = []
-chg = []
-fix = []
+add, chg, fix = [], [], []
 
 for l in lines:
     low = l.lower()
@@ -56,8 +53,8 @@ for l in lines:
 def block(title, icon, items):
     if not items:
         return ""
-    content = "\n".join(items)
-    return f"[ {icon} ] {title}\n```{content}```\n"
+    content = "\\n".join(items)
+    return f"[ {icon} ] {title}\\n```{content}```\\n"
 
 description = (
     block("ADD", "+", add) +
@@ -66,31 +63,20 @@ description = (
 ).strip()
 
 payload = {
-  "username": "Update Service",
-  "avatar_url": "https://i.ibb.co/9mxLgNg7/thumbnail.png",
-  "embeds": [
-    {
-      "title": f"🎮 Game Script Update — v{os.getenv('VERSION','unknown')}",
-      "description": description,
-      "color": 0x2B2D31,
-      "fields": [
+    "username": "Update Service",
+    "embeds": [
         {
-          "name": "📦 Script Type",
-          "value": "Game Script",
-          "inline": True
-        },
-        {
-          "name": "🔐 Build",
-          "value": "Private",
-          "inline": True
+            "title": f"🎮 Game Script Update — v{os.getenv('VERSION','unknown')}",
+            "description": description,
+            "color": 0x2B2D31,
+            "fields": [
+                {"name": "📦 Script Type", "value": "Game Script", "inline": True},
+                {"name": "🔐 Build", "value": "Private", "inline": True}
+            ],
+            "footer": {"text": "Automated Update • Secure Channel"},
+            "timestamp": os.getenv("TIMESTAMP")
         }
-      ],
-      "footer": {
-        "text": "Automated Update • Secure Channel"
-      },
-      "timestamp": os.getenv("TIMESTAMP")
-    }
-  ]
+    ]
 }
 
 print(json.dumps(payload))
