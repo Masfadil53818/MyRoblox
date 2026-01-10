@@ -1,5 +1,5 @@
---// Cornello Utility Hub NEXT LEVEL
---// Full Custom UI | Modal | Slider | Theme | Debug | FPS Saver
+--// Cornello Utility Hub NEXT LEVEL (CLEAN)
+--// Full Custom UI | Modal | Theme | Debug | FPS Saver | FIXED
 
 if getgenv().CornelloLoaded then return end
 getgenv().CornelloLoaded = true
@@ -47,9 +47,11 @@ pcall(function()
 end)
 
 -- ================= UI ROOT =================
-local UI = Instance.new("ScreenGui", CoreGui)
+local UI = Instance.new("ScreenGui")
 UI.Name = "CornelloUI"
 UI.ResetOnSpawn = false
+UI.IgnoreGuiInset = true
+UI.Parent = CoreGui
 
 -- ================= THEME =================
 local Themes = {
@@ -57,40 +59,66 @@ local Themes = {
 	Dark = Color3.fromRGB(40,40,40),
 	Amoled = Color3.fromRGB(0,0,0)
 }
-
 local Accent = Themes[getgenv().CornelloConfig.Theme] or Themes.Purple
 
 -- ================= TWEEN =================
 local function Tween(o,t,p)
-	TweenService:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),p):Play()
-end
-
--- ================= LOG SYSTEM =================
-local Logs = {}
-local function Log(msg)
-	table.insert(Logs, os.date("%X").." | "..msg)
+	TweenService:Create(
+		o,
+		TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		p
+	):Play()
 end
 
 -- ================= FLOATING ICON =================
-local Icon = Instance.new("ImageButton", UI)
+local Icon = Instance.new("ImageButton")
 Icon.Size = UDim2.fromOffset(56,56)
 Icon.Position = UDim2.fromScale(0.05,0.5)
 Icon.Image = "rbxassetid://4483345998"
 Icon.BackgroundColor3 = Accent
 Icon.BackgroundTransparency = 0.2
-Icon.Draggable = true
-Icon.Active = true
 Icon.BorderSizePixel = 0
+Icon.Parent = UI
+Icon.Active = true
 Instance.new("UICorner", Icon).CornerRadius = UDim.new(1,0)
 
+-- Drag manual (stable)
+do
+	local dragging, dragStart, startPos
+	Icon.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = i.Position
+			startPos = Icon.Position
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(i)
+		if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = i.Position - dragStart
+			Icon.Position = UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+end
+
 -- ================= MAIN WINDOW =================
-local Main = Instance.new("Frame", UI)
+local Main = Instance.new("Frame")
 Main.Size = UDim2.fromScale(0,0)
 Main.Position = UDim2.fromScale(0.5,0.5)
 Main.AnchorPoint = Vector2.new(0.5,0.5)
 Main.BackgroundColor3 = Accent
 Main.BackgroundTransparency = 0.15
 Main.Visible = false
+Main.Parent = UI
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0,18)
 
 Icon.MouseButton1Click:Connect(function()
@@ -99,36 +127,48 @@ Icon.MouseButton1Click:Connect(function()
 	Tween(Main,0.25,{Size=UDim2.fromScale(0.35,0.45)})
 end)
 
--- ================= CATEGORY =================
+-- ================= CATEGORY LAYOUT =================
+local List = Instance.new("UIListLayout", Main)
+List.Padding = UDim.new(0,10)
+List.HorizontalAlignment = Enum.HorizontalAlignment.Center
+List.VerticalAlignment = Enum.VerticalAlignment.Top
+
+List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	Main.CanvasSize = UDim2.fromOffset(0, List.AbsoluteContentSize.Y)
+end)
+
+-- ================= CATEGORY BUTTON =================
 local function Category(name, callback)
-	local B = Instance.new("TextButton", Main)
+	local B = Instance.new("TextButton")
 	B.Size = UDim2.new(1,-40,0,45)
-	B.Position = UDim2.fromOffset(20, (#Main:GetChildren()-1)*55 + 20)
 	B.Text = name
 	B.BackgroundColor3 = Accent
 	B.TextColor3 = Color3.new(1,1,1)
 	B.Font = Enum.Font.Gotham
 	B.TextSize = 15
+	B.Parent = Main
 	Instance.new("UICorner", B).CornerRadius = UDim.new(0,12)
 	B.MouseButton1Click:Connect(callback)
 end
 
 -- ================= MODAL =================
 local function Modal(title)
-	local BG = Instance.new("Frame", UI)
+	local BG = Instance.new("Frame")
 	BG.Size = UDim2.fromScale(1,1)
 	BG.BackgroundColor3 = Color3.new(0,0,0)
 	BG.BackgroundTransparency = 0.4
+	BG.Parent = UI
 
-	local M = Instance.new("Frame", BG)
+	local M = Instance.new("Frame")
 	M.Size = UDim2.fromScale(0.32,0.45)
 	M.Position = UDim2.fromScale(0.5,0.5)
 	M.AnchorPoint = Vector2.new(0.5,0.5)
 	M.BackgroundColor3 = Accent
 	M.BackgroundTransparency = 0.15
+	M.Parent = BG
 	Instance.new("UICorner", M).CornerRadius = UDim.new(0,16)
 
-	local T = Instance.new("TextLabel", M)
+	local T = Instance.new("TextLabel")
 	T.Text = title
 	T.Size = UDim2.new(1,-20,0,40)
 	T.Position = UDim2.fromOffset(10,10)
@@ -136,24 +176,22 @@ local function Modal(title)
 	T.BackgroundTransparency = 1
 	T.Font = Enum.Font.GothamBold
 	T.TextSize = 16
-	T.TextXAlignment = Left
+	T.TextXAlignment = Enum.TextXAlignment.Left
+	T.Parent = M
 
-	BG.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then
-			BG:Destroy()
-		end
+	BG.MouseButton1Click:Connect(function()
+		BG:Destroy()
 	end)
+
+	M.InputBegan:Connect(function() end) -- block close when clicking modal
 
 	return M
 end
 
 -- ================= FEATURES =================
-
 Category("Utility", function()
 	local M = Modal("Utility")
-	Log("Open Utility")
 
-	-- Anti AFK
 	local B = Instance.new("TextButton", M)
 	B.Size = UDim2.new(1,-40,0,40)
 	B.Position = UDim2.fromOffset(20,60)
@@ -171,7 +209,6 @@ end)
 
 Category("Server", function()
 	local M = Modal("Server")
-	Log("Open Server")
 
 	local B = Instance.new("TextButton", M)
 	B.Size = UDim2.new(1,-40,0,40)
@@ -190,7 +227,6 @@ end)
 
 Category("Webhook", function()
 	local M = Modal("Webhook")
-	Log("Open Webhook")
 
 	local Box = Instance.new("TextBox", M)
 	Box.Size = UDim2.new(1,-40,0,40)
@@ -207,7 +243,7 @@ Category("Webhook", function()
 	end)
 end)
 
--- ================= CORE =================
+-- ================= CORE SYSTEM =================
 
 -- Anti AFK
 task.spawn(function()
@@ -219,10 +255,17 @@ task.spawn(function()
 	end
 end)
 
--- FPS Saver
-RunService.RenderStepped:Connect(function()
+-- FPS Saver (safe)
+local lastQuality
+RunService.Heartbeat:Connect(function()
 	if getgenv().CornelloConfig.FpsSaver then
-		settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+		if not lastQuality then
+			lastQuality = settings().Rendering.QualityLevel
+			settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+		end
+	elseif lastQuality then
+		settings().Rendering.QualityLevel = lastQuality
+		lastQuality = nil
 	end
 end)
 
@@ -237,8 +280,6 @@ end)
 -- Auto Execute
 if queue and getgenv().CornelloConfig.AutoExecute then
 	queue([[
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Masfadil53818/MyRoblox/main/crnloader.lua",true))()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Masfadil53818/MyRoblox/main/crnloader.lua", true))()
 	]])
 end
-
-Log("Script Loaded")
