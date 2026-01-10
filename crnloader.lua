@@ -1,11 +1,10 @@
---[[  
- CornelloTeam – Advanced Multi Script Loader  
- Smooth Animation • Loading Effect • Progress Bar  
+--[[    
+ CornelloTeam – Advanced Multi Script Loader    
+ Smooth Animation • Loading Effect • Progress Bar    
 ]]
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 -- ================= CONFIG =================
@@ -20,6 +19,9 @@ local SCRIPTS = {
 }
 
 local IMAGE_URL = "https://ibb.co.com/9mxLgNg7"
+
+-- ================= SAVE STATE =================
+getgenv().CornelloLastScript = getgenv().CornelloLastScript or nil
 
 -- ================= UI ROOT =================
 local gui = Instance.new("ScreenGui")
@@ -63,7 +65,7 @@ title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 title.Position = UDim2.fromScale(0.05,0.05)
 title.Size = UDim2.fromScale(0.9,0.14)
-title.TextXAlignment = Left
+title.TextXAlignment = Enum.TextXAlignment.Left
 
 local status = Instance.new("TextLabel", content)
 status.Text = "Select a script"
@@ -73,7 +75,7 @@ status.TextColor3 = Color3.fromRGB(170,170,170)
 status.BackgroundTransparency = 1
 status.Position = UDim2.fromScale(0.05,0.2)
 status.Size = UDim2.fromScale(0.9,0.1)
-status.TextXAlignment = Left
+status.TextXAlignment = Enum.TextXAlignment.Left
 
 -- ================= SCRIPT LIST =================
 local list = Instance.new("Frame", content)
@@ -98,14 +100,6 @@ bar.BackgroundColor3 = Color3.fromRGB(0,170,255)
 bar.BorderSizePixel = 0
 Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
 
--- glow
-local glow = Instance.new("UIGradient", bar)
-glow.Rotation = 0
-glow.Color = ColorSequence.new{
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(0,170,255)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(0,255,255))
-}
-
 -- ================= LOADING DOTS =================
 local dots = 0
 local loading = false
@@ -120,7 +114,7 @@ task.spawn(function()
 	end
 end)
 
--- ================= PROGRESS FUNCTION =================
+-- ================= PROGRESS =================
 local function setProgress(p, txt)
 	status.Text = txt
 	TweenService:Create(
@@ -131,14 +125,15 @@ local function setProgress(p, txt)
 end
 
 -- ================= LOAD SCRIPT =================
-local function loadScript(path)
+local function loadScript(path, name)
+	getgenv().CornelloLastScript = name
 	loading = true
 	list.Visible = false
 
 	local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s")
 		:format(GITHUB_USER, GITHUB_REPO, BRANCH, path)
 
-	setProgress(0.2,"Fetching script")
+	setProgress(0.25,"Fetching script")
 	task.wait(0.6)
 
 	local ok, src = pcall(function()
@@ -150,7 +145,7 @@ local function loadScript(path)
 		return
 	end
 
-	setProgress(0.55,"Compiling")
+	setProgress(0.6,"Compiling")
 	task.wait(0.6)
 
 	local fn, err = loadstring(src)
@@ -164,12 +159,10 @@ local function loadScript(path)
 	setProgress(1,"Launching")
 	task.wait(0.5)
 
-	loading = false
-
 	TweenService:Create(
 		main,
 		TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
-		{Position = UDim2.fromScale(1.6,0.5), BackgroundTransparency = 1}
+		{Position = UDim2.fromScale(1.6,0.5)}
 	):Play()
 
 	task.wait(0.7)
@@ -186,18 +179,31 @@ for _,info in ipairs(SCRIPTS) do
 	btn.Font = Enum.Font.GothamBold
 	btn.TextSize = 14
 	btn.TextColor3 = Color3.new(1,1,1)
-	btn.BackgroundColor3 = Color3.fromRGB(28,28,28)
 	btn.BorderSizePixel = 0
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
 
+	-- auto highlight last script
+	if getgenv().CornelloLastScript == info.Name then
+		btn.BackgroundColor3 = Color3.fromRGB(0,170,255)
+	else
+		btn.BackgroundColor3 = Color3.fromRGB(28,28,28)
+	end
+
 	btn.MouseEnter:Connect(function()
-		TweenService:Create(btn,TweenInfo.new(0.2),{BackgroundColor3 = Color3.fromRGB(40,40,40)}):Play()
+		TweenService:Create(btn,TweenInfo.new(0.2),{
+			BackgroundColor3 = Color3.fromRGB(45,45,45)
+		}):Play()
 	end)
+
 	btn.MouseLeave:Connect(function()
-		TweenService:Create(btn,TweenInfo.new(0.2),{BackgroundColor3 = Color3.fromRGB(28,28,28)}):Play()
+		if getgenv().CornelloLastScript == info.Name then
+			btn.BackgroundColor3 = Color3.fromRGB(0,170,255)
+		else
+			btn.BackgroundColor3 = Color3.fromRGB(28,28,28)
+		end
 	end)
 
 	btn.MouseButton1Click:Connect(function()
-		loadScript(info.Path)
+		loadScript(info.Path, info.Name)
 	end)
 end
