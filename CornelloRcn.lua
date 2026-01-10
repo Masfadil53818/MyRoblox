@@ -1,32 +1,42 @@
---// Auto Reconnect & Anti AFK Script
+--// CornelloTeam Auto Reconnect & Anti AFK
+--// Version Loader + UI Revamp
 --// Made to survive Roblox being Roblox
 
-if not writefile then
-    warn("Executor kamu cupu, ga support writefile.")
-end
+--==============================--
+-- VERSION
+--==============================--
+local VERSION = "v0.0.1 [BETA]"
+pcall(function()
+    if isfile("version.txt") then
+        VERSION = readfile("version.txt")
+    end
+end)
 
+--==============================--
+-- SERVICES
+--==============================--
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
--- CONFIG FILE
+--==============================--
+-- CONFIG
+--==============================--
 local CONFIG_FILE = "AutoReconnectConfig.json"
-local reconnectCount = 0
-local disconnectCount = 0
 
--- DEFAULT CONFIG
 local Config = {
     AutoReconnect = true,
     AntiAFK = true,
-    WebhookEnabled = true,
+    WebhookEnabled = false,
     WebhookURL = "",
-    AutoSave = true
+    AutoSave = true,
+    AutoExecute = true
 }
 
--- LOAD CONFIG
 pcall(function()
     if isfile(CONFIG_FILE) then
         Config = HttpService:JSONDecode(readfile(CONFIG_FILE))
@@ -34,34 +44,29 @@ pcall(function()
 end)
 
 local function SaveConfig()
-    if Config.AutoSave then
+    if Config.AutoSave and writefile then
         writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
     end
 end
 
--- TIME FORMAT
+--==============================--
+-- UTIL
+--==============================--
 local function GetTime()
-    local t = os.date("*t")
     return os.date("%d-%m-%Y"), os.date("%H:%M:%S")
 end
 
--- WEBHOOK SEND
 local function SendWebhook(title, fields)
     if not Config.WebhookEnabled or Config.WebhookURL == "" then return end
 
     local date, time = GetTime()
-
-    local embed = {
-        title = title,
-        color = 65280,
-        fields = fields,
-        footer = {
-            text = date.." | "..time
-        }
-    }
-
     local data = {
-        embeds = {embed}
+        embeds = {{
+            title = title,
+            color = 5793266,
+            fields = fields,
+            footer = { text = date.." | "..time }
+        }}
     }
 
     pcall(function()
@@ -74,7 +79,9 @@ local function SendWebhook(title, fields)
     end)
 end
 
--- ANTI AFK
+--==============================--
+-- CORE SYSTEM
+--==============================--
 if Config.AntiAFK then
     LocalPlayer.Idled:Connect(function()
         VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
@@ -83,16 +90,9 @@ if Config.AntiAFK then
     end)
 end
 
--- DISCONNECT DETECT
 game:GetService("GuiService").ErrorMessageChanged:Connect(function(msg)
-    disconnectCount += 1
-    local date, time = GetTime()
-
-    SendWebhook("Disconnect Alert", {
-        {name="Date", value="```"..date.."```", inline=false},
-        {name="Time", value="```"..time.."```", inline=false},
-        {name="Reason", value="```"..msg.."```", inline=false},
-        {name="Leaved", value="```"..disconnectCount.."```", inline=false}
+    SendWebhook("Disconnect Detected", {
+        {name="Reason", value="```"..msg.."```"}
     })
 
     if Config.AutoReconnect then
@@ -101,66 +101,134 @@ game:GetService("GuiService").ErrorMessageChanged:Connect(function(msg)
     end
 end)
 
--- REJOIN SUCCESS
-Players.PlayerAdded:Connect(function(plr)
-    if plr == LocalPlayer then
-        reconnectCount += 1
-        local date, time = GetTime()
+if Config.AutoExecute then
+    queue_on_teleport([[
+        loadstring(game:HttpGet("PASTE_RAW_URL_DISINI"))()
+    ]])
+end
 
-        SendWebhook("Reconnect Successfully", {
-            {name="Date", value="```"..date.."```", inline=false},
-            {name="Time", value="```"..time.."```", inline=false},
-            {name="Connect", value="```"..reconnectCount.."```", inline=false}
-        })
-    end
-end)
-
--- AUTO EXECUTE AFTER TELEPORT
-queue_on_teleport([[
-    loadstring(game:HttpGet("PASTE_YOUR_RAW_SCRIPT_URL_HERE"))()
-]])
-
+--==============================--
 -- UI
-local ScreenGui = Instance.new("ScreenGui", CoreGui)
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0,300,0,320)
-Frame.Position = UDim2.new(0.5,-150,0.5,-160)
-Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-Frame.Active = true
-Frame.Draggable = true
+--==============================--
+local GUI = Instance.new("ScreenGui", CoreGui)
+GUI.Name = "CornelloTeamUI"
 
-local UIList = Instance.new("UIListLayout", Frame)
-UIList.Padding = UDim.new(0,8)
+local Main = Instance.new("Frame", GUI)
+Main.Size = UDim2.fromScale(0.35,0.45)
+Main.Position = UDim2.fromScale(0.5,0.5)
+Main.AnchorPoint = Vector2.new(0.5,0.5)
+Main.BackgroundColor3 = Color3.fromRGB(20,20,25)
+Main.Active = true
+Main.Draggable = true
+Main.ClipsDescendants = true
+Main.BackgroundTransparency = 0
 
-local function Toggle(text, callback)
-    local btn = Instance.new("TextButton", Frame)
-    btn.Size = UDim2.new(1,-10,0,40)
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    btn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,16)
 
-    btn.MouseButton1Click:Connect(function()
-        callback()
-        SaveConfig()
+-- HEADER
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1,0,0,45)
+Header.BackgroundTransparency = 1
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1,-50,1,0)
+Title.Position = UDim2.new(0,15,0,0)
+Title.Text = "CornelloTeam  "..VERSION
+Title.TextColor3 = Color3.fromRGB(200,200,255)
+Title.TextXAlignment = Left
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+
+local Minimize = Instance.new("TextButton", Header)
+Minimize.Size = UDim2.new(0,30,0,30)
+Minimize.Position = UDim2.new(1,-35,0.5,-15)
+Minimize.Text = "—"
+Minimize.BackgroundColor3 = Color3.fromRGB(50,50,60)
+Minimize.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", Minimize).CornerRadius = UDim.new(1,0)
+
+-- BODY
+local Body = Instance.new("Frame", Main)
+Body.Position = UDim2.new(0,0,0,50)
+Body.Size = UDim2.new(1,0,1,-50)
+Body.BackgroundTransparency = 1
+
+local Layout = Instance.new("UIListLayout", Body)
+Layout.Padding = UDim.new(0,10)
+
+-- TOGGLE CREATOR
+local function CreateToggle(name, flag)
+    local Holder = Instance.new("Frame", Body)
+    Holder.Size = UDim2.new(1,-20,0,45)
+    Holder.BackgroundColor3 = Color3.fromRGB(35,35,45)
+    Instance.new("UICorner", Holder).CornerRadius = UDim.new(0,12)
+
+    local Label = Instance.new("TextLabel", Holder)
+    Label.Size = UDim2.new(0.7,0,1,0)
+    Label.Position = UDim2.new(0,15,0,0)
+    Label.Text = name
+    Label.TextColor3 = Color3.new(1,1,1)
+    Label.BackgroundTransparency = 1
+    Label.TextXAlignment = Left
+    Label.Font = Enum.Font.Gotham
+
+    local Toggle = Instance.new("Frame", Holder)
+    Toggle.Size = UDim2.new(0,50,0,25)
+    Toggle.Position = UDim2.new(1,-65,0.5,-12)
+    Toggle.BackgroundColor3 = Config[flag] and Color3.fromRGB(0,170,255) or Color3.fromRGB(70,70,70)
+    Instance.new("UICorner", Toggle).CornerRadius = UDim.new(1,0)
+
+    local Dot = Instance.new("Frame", Toggle)
+    Dot.Size = UDim2.new(0,20,0,20)
+    Dot.Position = Config[flag] and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
+    Dot.BackgroundColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1,0)
+
+    Holder.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            Config[flag] = not Config[flag]
+            SaveConfig()
+
+            TweenService:Create(Toggle,TweenInfo.new(0.25),{
+                BackgroundColor3 = Config[flag] and Color3.fromRGB(0,170,255) or Color3.fromRGB(70,70,70)
+            }):Play()
+
+            TweenService:Create(Dot,TweenInfo.new(0.25),{
+                Position = Config[flag] and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
+            }):Play()
+        end
     end)
 end
 
-Toggle("Auto Reconnect: "..tostring(Config.AutoReconnect), function()
-    Config.AutoReconnect = not Config.AutoReconnect
+-- TOGGLES
+CreateToggle("Auto Reconnect","AutoReconnect")
+CreateToggle("Anti AFK","AntiAFK")
+CreateToggle("Webhook","WebhookEnabled")
+CreateToggle("Auto Save","AutoSave")
+CreateToggle("Auto Execute","AutoExecute")
+
+-- WEBHOOK INPUT
+local WebhookBox = Instance.new("TextBox", Body)
+WebhookBox.Size = UDim2.new(1,-20,0,40)
+WebhookBox.PlaceholderText = "Webhook URL"
+WebhookBox.Text = Config.WebhookURL
+WebhookBox.BackgroundColor3 = Color3.fromRGB(30,30,40)
+WebhookBox.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", WebhookBox).CornerRadius = UDim.new(0,10)
+
+WebhookBox.FocusLost:Connect(function()
+    Config.WebhookURL = WebhookBox.Text
+    SaveConfig()
 end)
 
-Toggle("Anti AFK: "..tostring(Config.AntiAFK), function()
-    Config.AntiAFK = not Config.AntiAFK
+-- MINIMIZE
+local minimized = false
+Minimize.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    TweenService:Create(Main,TweenInfo.new(0.3),{
+        Size = minimized and UDim2.fromScale(0.35,0.08) or UDim2.fromScale(0.35,0.45)
+    }):Play()
 end)
 
-Toggle("Webhook: "..tostring(Config.WebhookEnabled), function()
-    Config.WebhookEnabled = not Config.WebhookEnabled
-end)
-
-Toggle("Test Webhook", function()
-    SendWebhook("Webhook Test", {
-        {name="Status", value="```Webhook Aktif```", inline=false}
-    })
-end)
-
-print("Auto Reconnect Script Loaded. Tinggal main, biar script yang stress.")
+print("CornelloTeam Loaded | "..VERSION)
