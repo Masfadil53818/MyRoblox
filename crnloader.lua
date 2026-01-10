@@ -1,4 +1,3 @@
-
 --[[  
  CornelloTeam – Advanced Multi Script Loader  
  Smooth Animation • Loading Effect • Progress Bar  
@@ -16,7 +15,7 @@ local BRANCH = "main"
 
 local SCRIPTS = {
 	{Name = "CrnX AI", Path = "CrnXAi.lua"},
-	{Name = "Auto Farm", Path = "AutoFarm.lua"},
+	{Name = "Auto Reconnect", Path = "CornelloRcn.lua"},
 	{Name = "ESP + Aimbot", Path = "EspAimbot.lua"},
 }
 
