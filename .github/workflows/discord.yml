@@ -9,28 +9,60 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Read version
-        run: |
-          echo "VERSION=$(tr -d '\r' < version.txt)" >> $GITHUB_ENV
+        run: echo "VERSION=$(cat version.txt | tr -d '\r')" >> $GITHUB_ENV
 
-      - name: Send stealth update to Discord
+      - name: Send Discord update
         env:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
           RAW_CHANGELOG: ${{ github.event.head_commit.message }}
-          TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          if [ -z "$DISCORD_WEBHOOK" ]; then exit 1; fi
+          python3 - <<PY
+import os, json, urllib.request
 
-          PAYLOAD=$(python3 -c "import os,json;raw=os.getenv('RAW_CHANGELOG','');lines=[l.strip() for l in raw.splitlines() if l.strip()];add=[];chg=[];fix=[];\
-[add.append(l[1:].strip()) if l.startswith('+') else fix.append(l[1:].strip()) if l.startswith('/') else chg.append(l[1:].strip()) if l.startswith('-') else chg.append(l) for l in lines];\
-blk=lambda t,i,v: '' if not v else f'[ {i} ] {t}\\n```'+'\\n'.join(v)+'```\\n';\
-desc=(blk('ADD','+',add)+blk('CHANGE','─',chg)+blk('FIX','/',fix)).strip();\
-print(json.dumps({'username':'Update Service','embeds':[{'title':f\"🎮 Game Script Update — v{os.getenv('VERSION','unknown')}\",'description':desc,'color':0x2B2D31,'footer':{'text':'Automated Update • Secure Channel'},'timestamp':os.getenv('TIMESTAMP')}]}))")
+raw = os.getenv("RAW_CHANGELOG","").strip().splitlines()
 
-          curl -sS -X POST \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "$DISCORD_WEBHOOK"
+add, chg, fix = [], [], []
+
+for l in raw:
+    l = l.strip()
+    if not l: continue
+    if l.startswith("+"):
+        add.append(l[1:].strip())
+    elif l.startswith("-"):
+        chg.append(l[1:].strip())
+    elif l.startswith("/"):
+        fix.append(l[1:].strip())
+    else:
+        chg.append(l)
+
+def block(name, sym, items):
+    if not items:
+        return ""
+    return "[ %s ] %s\n```%s```\n" % (sym, name, "\n".join(items))
+
+desc = (
+    block("ADD", "+", add) +
+    block("CHANGE", "-", chg) +
+    block("FIX", "/", fix)
+).strip()
+
+payload = {
+    "username": "Update Service",
+    "embeds": [{
+        "title": "Game Script Update v" + os.getenv("VERSION","unknown"),
+        "description": desc,
+        "color": 2829617
+    }]
+}
+
+req = urllib.request.Request(
+    os.getenv("DISCORD_WEBHOOK"),
+    data=json.dumps(payload).encode(),
+    headers={"Content-Type": "application/json"}
+)
+
+urllib.request.urlopen(req)
+PY
