@@ -41,7 +41,7 @@ jobs:
               "content": "Game Script Updated",
               "embeds": [{
                   "description": desc,
-                  "color": 3092790,
+                  "color": 3066993,
                   "thumbnail": {
                       "url": "https://i.ibb.co/9mxLgNg7/thumbnail.png"
                   }
