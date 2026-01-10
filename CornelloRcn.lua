@@ -51,7 +51,7 @@ local function SaveConfig()
 end
 
 --==============================--
--- CORE SYSTEM (UNCHANGED)
+-- CORE SYSTEM
 --==============================--
 if Config.AntiAFK then
     LocalPlayer.Idled:Connect(function()
@@ -61,7 +61,7 @@ if Config.AntiAFK then
     end)
 end
 
-GuiService.ErrorMessageChanged:Connect(function(msg)
+GuiService.ErrorMessageChanged:Connect(function()
     if Config.AutoReconnect then
         task.wait(5)
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
@@ -89,7 +89,7 @@ Main.AnchorPoint = Vector2.new(0.5,0.5)
 Main.BackgroundColor3 = Color3.fromRGB(18,18,23)
 Main.Active = true
 Main.Draggable = true
-Main.ClipsDescendants = true
+Main.ClipsDescendants = false
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0,16)
 
 --==============================--
@@ -121,16 +121,21 @@ Minimize.AutoButtonColor = false
 Instance.new("UICorner", Minimize).CornerRadius = UDim.new(1,0)
 
 --==============================--
--- SCROLL BODY
+-- SCROLL BODY (FIXED)
 --==============================--
 local Body = Instance.new("ScrollingFrame", Main)
 Body.Position = UDim2.new(0,0,0,50)
 Body.Size = UDim2.new(1,0,1,-50)
 Body.CanvasSize = UDim2.new(0,0,0,0)
-Body.ScrollBarImageTransparency = 0.5
-Body.ScrollBarThickness = 4
+Body.ScrollBarImageTransparency = 0.4
+Body.ScrollBarThickness = 5
+Body.ScrollingEnabled = true
+Body.Active = true
 Body.BackgroundTransparency = 1
+Body.BorderSizePixel = 0
 Body.AutomaticCanvasSize = Enum.AutomaticSize.None
+Body.ScrollingDirection = Enum.ScrollingDirection.Y
+Body.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
 
 local Padding = Instance.new("UIPadding", Body)
 Padding.PaddingLeft = UDim.new(0,10)
@@ -152,6 +157,7 @@ local function CreateToggle(text, flag)
     local Holder = Instance.new("Frame", Body)
     Holder.Size = UDim2.new(1,0,0,45)
     Holder.BackgroundColor3 = Color3.fromRGB(32,32,42)
+    Holder.Active = false
     Instance.new("UICorner", Holder).CornerRadius = UDim.new(0,12)
 
     local Label = Instance.new("TextLabel", Holder)
@@ -180,7 +186,6 @@ local function CreateToggle(text, flag)
         TweenService:Create(Toggle,TweenInfo.new(0.25),{
             BackgroundColor3 = Config[flag] and Color3.fromRGB(0,170,255) or Color3.fromRGB(70,70,70)
         }):Play()
-
         TweenService:Create(Dot,TweenInfo.new(0.25),{
             Position = Config[flag] and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,3,0.5,-9)
         }):Play()
