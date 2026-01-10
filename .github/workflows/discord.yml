@@ -9,46 +9,95 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Read version
         run: echo "VERSION=$(cat version.txt | tr -d '\r')" >> $GITHUB_ENV
 
-      - name: Send message to Discord
+      - name: Send stealth update to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
-          CHANGELOG: ${{ github.event.head_commit.message }}
+          RAW_CHANGELOG: ${{ github.event.head_commit.message }}
           TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          # fail early with clear message when secret is not set
           if [ -z "$DISCORD_WEBHOOK" ]; then
-            echo "ERROR: secret 'UPDATESCRIPT' is not set. Please add it in Settings -> Secrets -> Actions.";
-            exit 1;
+            echo "ERROR: Webhook not set"
+            exit 1
           fi
 
-          # basic URL validation to catch obvious mistakes
-          if ! echo "$DISCORD_WEBHOOK" | grep -Eq "https?://(canary\.)?discord(app)?\.com/api/webhooks/"; then
-            echo "ERROR: secret 'UPDATESCRIPT' does not look like a Discord webhook URL.";
-            echo "Value: $DISCORD_WEBHOOK";
-            exit 1;
-          fi
+          PAYLOAD=$(python - << 'EOF'
+import os, json
 
-          # build JSON payload safely using Python to ensure proper escaping
-          PAYLOAD=$(python -c 'import os, json; payload = {"username": "CornelloTeam", "embeds": [{"title": f"Update Script — CornelloTeam v{os.getenv("VERSION","unknown")}", "description": os.getenv("CHANGELOG","No changelog provided"), "color": 5763714, "fields": [{"name":"Version","value": os.getenv("VERSION","unknown"), "inline": True}, {"name":"Changelog","value": os.getenv("CHANGELOG","").strip() or "No changelog", "inline": False}], "thumbnail": {"url": "https://i.ibb.co/9mxLgNg7/thumbnail.png"}, "footer": {"text": "Public Update • CornelloTeam"}, "timestamp": os.getenv("TIMESTAMP")}]} ; print(json.dumps(payload))')
+raw = os.getenv("RAW_CHANGELOG","").strip()
 
-          # DEBUG: print payload for inspection (will not reveal webhook)
-          echo "PAYLOAD: $PAYLOAD"
+# Split lines from commit message
+lines = [l.strip() for l in raw.splitlines() if l.strip()]
 
-          # send and check HTTP status
-          HTTP_STATUS=$(curl -sS -w "%{http_code}" -o /dev/null -X POST \
+# Fallback if commit message is one line
+if not lines:
+    lines = ["minor internal update"]
+
+add = []
+chg = []
+fix = []
+
+for l in lines:
+    low = l.lower()
+    if low.startswith(("+", "[+]","add","adding")):
+        add.append(l.lstrip("+[] ").strip())
+    elif low.startswith(("-", "change","improve","update")):
+        chg.append(l.lstrip("- ").strip())
+    elif low.startswith(("/", "fix","fixed")):
+        fix.append(l.lstrip("/ ").strip())
+    else:
+        chg.append(l)
+
+def block(title, icon, items):
+    if not items:
+        return ""
+    content = "\n".join(items)
+    return f"[ {icon} ] {title}\n```{content}```\n"
+
+description = (
+    block("ADD", "+", add) +
+    block("CHANGE", "─", chg) +
+    block("FIX", "/", fix)
+).strip()
+
+payload = {
+  "username": "Update Service",
+  "avatar_url": "https://i.ibb.co/9mxLgNg7/thumbnail.png",
+  "embeds": [
+    {
+      "title": f"🎮 Game Script Update — v{os.getenv('VERSION','unknown')}",
+      "description": description,
+      "color": 0x2B2D31,
+      "fields": [
+        {
+          "name": "📦 Script Type",
+          "value": "Game Script",
+          "inline": True
+        },
+        {
+          "name": "🔐 Build",
+          "value": "Private",
+          "inline": True
+        }
+      ],
+      "footer": {
+        "text": "Automated Update • Secure Channel"
+      },
+      "timestamp": os.getenv("TIMESTAMP")
+    }
+  ]
+}
+
+print(json.dumps(payload))
+EOF
+)
+
+          curl -sS -X POST \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" "$DISCORD_WEBHOOK")
-
-          echo "Discord webhook returned HTTP $HTTP_STATUS"
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "Discord embed notification sent successfully.";
-          else
-            echo "ERROR: Discord webhook returned non-success status $HTTP_STATUS";
-            exit 1;
-          fi
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK"
