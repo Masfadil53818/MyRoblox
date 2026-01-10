@@ -17,71 +17,18 @@ jobs:
           echo "VERSION=$(tr -d '\r' < version.txt)" >> $GITHUB_ENV
 
       - name: Send stealth update to Discord
-        shell: bash
         env:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
           RAW_CHANGELOG: ${{ github.event.head_commit.message }}
           TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          if [ -z "$DISCORD_WEBHOOK" ]; then
-            echo "ERROR: Webhook not set"
-            exit 1
-          fi
+          if [ -z "$DISCORD_WEBHOOK" ]; then exit 1; fi
 
-          PAYLOAD=$(python3 <<EOF
-import os, json
-
-raw = os.getenv("RAW_CHANGELOG", "").strip()
-lines = [l.strip() for l in raw.splitlines() if l.strip()]
-
-if not lines:
-    lines = ["minor internal update"]
-
-add, chg, fix = [], [], []
-
-for l in lines:
-    low = l.lower()
-    if low.startswith(("+", "[+]","add","adding")):
-        add.append(l.lstrip("+[] ").strip())
-    elif low.startswith(("-", "change","improve","update")):
-        chg.append(l.lstrip("- ").strip())
-    elif low.startswith(("/", "fix","fixed")):
-        fix.append(l.lstrip("/ ").strip())
-    else:
-        chg.append(l)
-
-def block(title, icon, items):
-    if not items:
-        return ""
-    content = "\\n".join(items)
-    return f"[ {icon} ] {title}\\n```{content}```\\n"
-
-description = (
-    block("ADD", "+", add) +
-    block("CHANGE", "─", chg) +
-    block("FIX", "/", fix)
-).strip()
-
-payload = {
-    "username": "Update Service",
-    "embeds": [
-        {
-            "title": f"🎮 Game Script Update — v{os.getenv('VERSION','unknown')}",
-            "description": description,
-            "color": 0x2B2D31,
-            "fields": [
-                {"name": "📦 Script Type", "value": "Game Script", "inline": True},
-                {"name": "🔐 Build", "value": "Private", "inline": True}
-            ],
-            "footer": {"text": "Automated Update • Secure Channel"},
-            "timestamp": os.getenv("TIMESTAMP")
-        }
-    ]
-}
-
-print(json.dumps(payload))
-EOF
-)
+          PAYLOAD=$(python3 -c "import os,json;raw=os.getenv('RAW_CHANGELOG','');lines=[l.strip() for l in raw.splitlines() if l.strip()];add=[];chg=[];fix=[];\
+[add.append(l[1:].strip()) if l.startswith('+') else fix.append(l[1:].strip()) if l.startswith('/') else chg.append(l[1:].strip()) if l.startswith('-') else chg.append(l) for l in lines];\
+blk=lambda t,i,v: '' if not v else f'[ {i} ] {t}\\n```'+'\\n'.join(v)+'```\\n';\
+desc=(blk('ADD','+',add)+blk('CHANGE','─',chg)+blk('FIX','/',fix)).strip();\
+print(json.dumps({'username':'Update Service','embeds':[{'title':f\"🎮 Game Script Update — v{os.getenv('VERSION','unknown')}\",'description':desc,'color':0x2B2D31,'footer':{'text':'Automated Update • Secure Channel'},'timestamp':os.getenv('TIMESTAMP')}]}))")
 
           curl -sS -X POST \
             -H "Content-Type: application/json" \
