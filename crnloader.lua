@@ -172,14 +172,15 @@ end
 
 -- ================= BUTTONS =================
 for _,info in ipairs(SCRIPTS) do
-	local btn = Instance.new("TextButton", list)
-	btn.Size = UDim2.fromScale(1,0)
-	btn.AutomaticSize = Y
+	local btn = Instance.new("TextButton")
+	btn.Parent = list
+	btn.Size = UDim2.fromScale(1, 0.22) -- FIX: ukuran aman
 	btn.Text = info.Name
 	btn.Font = Enum.Font.GothamBold
 	btn.TextSize = 14
 	btn.TextColor3 = Color3.new(1,1,1)
 	btn.BorderSizePixel = 0
+	btn.AutoButtonColor = false
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
 
 	-- auto highlight last script
@@ -190,9 +191,11 @@ for _,info in ipairs(SCRIPTS) do
 	end
 
 	btn.MouseEnter:Connect(function()
-		TweenService:Create(btn,TweenInfo.new(0.2),{
-			BackgroundColor3 = Color3.fromRGB(45,45,45)
-		}):Play()
+		TweenService:Create(
+			btn,
+			TweenInfo.new(0.2, Enum.EasingStyle.Quad),
+			{BackgroundColor3 = Color3.fromRGB(45,45,45)}
+		):Play()
 	end)
 
 	btn.MouseLeave:Connect(function()
