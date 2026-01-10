@@ -1,5 +1,5 @@
---// Cornello Utility Hub NEXT LEVEL (CLEAN)
---// Full Custom UI | Modal | Theme | Debug | FPS Saver | FIXED
+--// Cornello Utility Hub ULTIMATE
+--// Stable | Animated | Webhook | FPS Boost | Fixed AFK
 
 if getgenv().CornelloLoaded then return end
 getgenv().CornelloLoaded = true
@@ -11,34 +11,23 @@ local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
 
 local LP = Players.LocalPlayer
-
--- ================= EXECUTOR =================
-local queue = queue_on_teleport or (syn and syn.queue_on_teleport)
 local request = http_request or request or (syn and syn.request)
 
 -- ================= CONFIG =================
 local CFG = "cornello_config.json"
-
-getgenv().CornelloConfig = getgenv().CornelloConfig or {
+getgenv().CornelloConfig = {
 	AntiAFK = false,
-	AFKDelay = 600,
-	AutoExecute = true,
 	AutoReconnect = true,
-	ReconnectDelay = 3,
-	MaxRetry = 5,
-	FpsSaver = false,
-	SafeMode = false,
-	Theme = "Purple",
-	Webhook = ""
+	AutoSave = true,
+	FPSBoost = "OFF",
+	WebhookEnabled = false,
+	WebhookURL = "",
+	Theme = "Purple"
 }
-
-local function Save()
-	writefile(CFG, HttpService:JSONEncode(getgenv().CornelloConfig))
-end
 
 pcall(function()
 	if isfile(CFG) then
@@ -46,208 +35,216 @@ pcall(function()
 	end
 end)
 
--- ================= UI ROOT =================
-local UI = Instance.new("ScreenGui")
-UI.Name = "CornelloUI"
-UI.ResetOnSpawn = false
-UI.IgnoreGuiInset = true
-UI.Parent = CoreGui
+local function Save()
+	if getgenv().CornelloConfig.AutoSave then
+		writefile(CFG, HttpService:JSONEncode(getgenv().CornelloConfig))
+	end
+end
 
 -- ================= THEME =================
 local Themes = {
-	Purple = Color3.fromRGB(90,60,160),
-	Dark = Color3.fromRGB(40,40,40),
-	Amoled = Color3.fromRGB(0,0,0)
+	Purple = {
+		Accent = Color3.fromRGB(140,90,220),
+		Dark = Color3.fromRGB(28,28,34)
+	},
+	Blue = {
+		Accent = Color3.fromRGB(80,140,255),
+		Dark = Color3.fromRGB(24,26,32)
+	}
 }
-local Accent = Themes[getgenv().CornelloConfig.Theme] or Themes.Purple
 
--- ================= TWEEN =================
+local Theme = Themes[getgenv().CornelloConfig.Theme]
+
+-- ================= UI ROOT =================
+local UI = Instance.new("ScreenGui", CoreGui)
+UI.Name = "CornelloUI"
+UI.ResetOnSpawn = false
+
 local function Tween(o,t,p)
-	TweenService:Create(
-		o,
-		TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		p
-	):Play()
+	TweenService:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),p):Play()
 end
 
--- ================= FLOATING ICON =================
-local Icon = Instance.new("ImageButton")
+-- ================= FLOAT ICON (LOGO C) =================
+local Icon = Instance.new("TextButton", UI)
 Icon.Size = UDim2.fromOffset(56,56)
 Icon.Position = UDim2.fromScale(0.05,0.5)
-Icon.Image = "rbxassetid://4483345998"
-Icon.BackgroundColor3 = Accent
-Icon.BackgroundTransparency = 0.2
-Icon.BorderSizePixel = 0
-Icon.Parent = UI
-Icon.Active = true
+Icon.Text = "C"
+Icon.Font = Enum.Font.GothamBlack
+Icon.TextSize = 26
+Icon.TextColor3 = Color3.new(1,1,1)
+Icon.BackgroundColor3 = Theme.Accent
+Icon.BackgroundTransparency = 0.15
 Instance.new("UICorner", Icon).CornerRadius = UDim.new(1,0)
 
--- Drag manual (stable)
 do
-	local dragging, dragStart, startPos
+	local drag,start,pos
 	Icon.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			dragStart = i.Position
-			startPos = Icon.Position
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			drag=true start=i.Position pos=Icon.Position
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(i)
-		if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
-			local delta = i.Position - dragStart
-			Icon.Position = UDim2.new(
-				startPos.X.Scale,
-				startPos.X.Offset + delta.X,
-				startPos.Y.Scale,
-				startPos.Y.Offset + delta.Y
-			)
+		if drag and i.UserInputType==Enum.UserInputType.MouseMovement then
+			local d=i.Position-start
+			Icon.Position=UDim2.new(pos.X.Scale,pos.X.Offset+d.X,pos.Y.Scale,pos.Y.Offset+d.Y)
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-		end
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
 	end)
 end
 
 -- ================= MAIN WINDOW =================
-local Main = Instance.new("Frame")
+local Main = Instance.new("Frame", UI)
 Main.Size = UDim2.fromScale(0,0)
 Main.Position = UDim2.fromScale(0.5,0.5)
 Main.AnchorPoint = Vector2.new(0.5,0.5)
-Main.BackgroundColor3 = Accent
-Main.BackgroundTransparency = 0.15
+Main.BackgroundColor3 = Theme.Dark
 Main.Visible = false
-Main.Parent = UI
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0,18)
 
-Icon.MouseButton1Click:Connect(function()
-	Main.Visible = true
-	Main.Size = UDim2.fromScale(0,0)
-	Tween(Main,0.25,{Size=UDim2.fromScale(0.35,0.45)})
+-- Header
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1,0,0,46)
+Header.BackgroundColor3 = Theme.Accent
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0,18)
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1,-80,1,0)
+Title.Position = UDim2.fromOffset(12,0)
+Title.Text = "Cornello Utility Hub"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Minimize
+local Min = Instance.new("TextButton", Header)
+Min.Size = UDim2.fromOffset(36,36)
+Min.Position = UDim2.new(1,-42,0.5,-18)
+Min.Text = "–"
+Min.Font = Enum.Font.GothamBold
+Min.TextSize = 22
+Min.TextColor3 = Color3.new(1,1,1)
+Min.BackgroundTransparency = 1
+
+Min.MouseButton1Click:Connect(function()
+	Tween(Main,0.25,{Size=UDim2.fromScale(0,0)})
+	task.delay(0.25,function() Main.Visible=false end)
 end)
 
--- ================= CATEGORY LAYOUT =================
-local List = Instance.new("UIListLayout", Main)
-List.Padding = UDim.new(0,10)
-List.HorizontalAlignment = Enum.HorizontalAlignment.Center
-List.VerticalAlignment = Enum.VerticalAlignment.Top
+-- ================= CONTENT (SCROLL FIX) =================
+local Content = Instance.new("ScrollingFrame", Main)
+Content.Position = UDim2.fromOffset(0,56)
+Content.Size = UDim2.new(1,0,1,-60)
+Content.CanvasSize = UDim2.new(0,0,0,0)
+Content.ScrollBarImageTransparency = 0.8
+Content.BackgroundTransparency = 1
+Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
-List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	Main.CanvasSize = UDim2.fromOffset(0, List.AbsoluteContentSize.Y)
-end)
+local Layout = Instance.new("UIListLayout", Content)
+Layout.Padding = UDim.new(0,10)
 
--- ================= CATEGORY BUTTON =================
-local function Category(name, callback)
-	local B = Instance.new("TextButton")
-	B.Size = UDim2.new(1,-40,0,45)
-	B.Text = name
-	B.BackgroundColor3 = Accent
-	B.TextColor3 = Color3.new(1,1,1)
-	B.Font = Enum.Font.Gotham
-	B.TextSize = 15
-	B.Parent = Main
-	Instance.new("UICorner", B).CornerRadius = UDim.new(0,12)
+-- ================= CATEGORY =================
+local function Category(name)
+	local Holder = Instance.new("Frame", Content)
+	Holder.Size = UDim2.new(1,-30,0,46)
+	Holder.BackgroundTransparency = 1
+
+	local Btn = Instance.new("TextButton", Holder)
+	Btn.Size = UDim2.new(1,0,0,46)
+	Btn.Text = name
+	Btn.Font = Enum.Font.GothamMedium
+	Btn.TextSize = 15
+	Btn.TextColor3 = Color3.new(1,1,1)
+	Btn.BackgroundColor3 = Theme.Accent
+	Instance.new("UICorner", Btn).CornerRadius = UDim.new(0,12)
+
+	local Panel = Instance.new("Frame", Holder)
+	Panel.Position = UDim2.fromOffset(0,52)
+	Panel.Size = UDim2.new(1,0,0,0)
+	Panel.ClipsDescendants = true
+	Panel.BackgroundColor3 = Color3.fromRGB(40,40,50)
+	Instance.new("UICorner", Panel).CornerRadius = UDim.new(0,12)
+
+	local PL = Instance.new("UIListLayout", Panel)
+	PL.Padding = UDim.new(0,8)
+
+	local open=false
+	local function Refresh()
+		local h=open and (PL.AbsoluteContentSize.Y+12) or 0
+		Tween(Panel,0.25,{Size=UDim2.new(1,0,0,h)})
+		Tween(Holder,0.25,{Size=UDim2.new(1,-30,0,46+h)})
+	end
+
+	Btn.MouseButton1Click:Connect(function()
+		open=not open
+		Refresh()
+	end)
+
+	return Panel
+end
+
+local function Button(parent,text,callback)
+	local B=Instance.new("TextButton",parent)
+	B.Size=UDim2.new(1,-20,0,36)
+	B.Text=text
+	B.Font=Enum.Font.Gotham
+	B.TextSize=14
+	B.TextColor3=Color3.new(1,1,1)
+	B.BackgroundColor3=Theme.Accent
+	Instance.new("UICorner",B).CornerRadius=UDim.new(0,10)
 	B.MouseButton1Click:Connect(callback)
+	return B
 end
 
--- ================= MODAL =================
-local function Modal(title)
-	local BG = Instance.new("Frame")
-	BG.Size = UDim2.fromScale(1,1)
-	BG.BackgroundColor3 = Color3.new(0,0,0)
-	BG.BackgroundTransparency = 0.4
-	BG.Parent = UI
+-- ================= UTILITY =================
+local Utility = Category("Utility")
 
-	local M = Instance.new("Frame")
-	M.Size = UDim2.fromScale(0.32,0.45)
-	M.Position = UDim2.fromScale(0.5,0.5)
-	M.AnchorPoint = Vector2.new(0.5,0.5)
-	M.BackgroundColor3 = Accent
-	M.BackgroundTransparency = 0.15
-	M.Parent = BG
-	Instance.new("UICorner", M).CornerRadius = UDim.new(0,16)
-
-	local T = Instance.new("TextLabel")
-	T.Text = title
-	T.Size = UDim2.new(1,-20,0,40)
-	T.Position = UDim2.fromOffset(10,10)
-	T.TextColor3 = Color3.new(1,1,1)
-	T.BackgroundTransparency = 1
-	T.Font = Enum.Font.GothamBold
-	T.TextSize = 16
-	T.TextXAlignment = Enum.TextXAlignment.Left
-	T.Parent = M
-
-	BG.MouseButton1Click:Connect(function()
-		BG:Destroy()
-	end)
-
-	M.InputBegan:Connect(function() end) -- block close when clicking modal
-
-	return M
-end
-
--- ================= FEATURES =================
-Category("Utility", function()
-	local M = Modal("Utility")
-
-	local B = Instance.new("TextButton", M)
-	B.Size = UDim2.new(1,-40,0,40)
-	B.Position = UDim2.fromOffset(20,60)
-	B.Text = "Anti AFK: "..(getgenv().CornelloConfig.AntiAFK and "ON" or "OFF")
-	B.BackgroundColor3 = Accent
-	B.TextColor3 = Color3.new(1,1,1)
-	Instance.new("UICorner", B).CornerRadius = UDim.new(0,12)
-
-	B.MouseButton1Click:Connect(function()
-		getgenv().CornelloConfig.AntiAFK = not getgenv().CornelloConfig.AntiAFK
-		B.Text = "Anti AFK: "..(getgenv().CornelloConfig.AntiAFK and "ON" or "OFF")
-		Save()
-	end)
+local AntiBtn
+AntiBtn = Button(Utility,"Anti AFK: OFF",function()
+	getgenv().CornelloConfig.AntiAFK = not getgenv().CornelloConfig.AntiAFK
+	AntiBtn.Text = "Anti AFK: "..(getgenv().CornelloConfig.AntiAFK and "ON" or "OFF")
+	Save()
 end)
 
-Category("Server", function()
-	local M = Modal("Server")
-
-	local B = Instance.new("TextButton", M)
-	B.Size = UDim2.new(1,-40,0,40)
-	B.Position = UDim2.fromOffset(20,60)
-	B.Text = "Auto Reconnect: "..(getgenv().CornelloConfig.AutoReconnect and "ON" or "OFF")
-	B.BackgroundColor3 = Accent
-	B.TextColor3 = Color3.new(1,1,1)
-	Instance.new("UICorner", B).CornerRadius = UDim.new(0,12)
-
-	B.MouseButton1Click:Connect(function()
-		getgenv().CornelloConfig.AutoReconnect = not getgenv().CornelloConfig.AutoReconnect
-		B.Text = "Auto Reconnect: "..(getgenv().CornelloConfig.AutoReconnect and "ON" or "OFF")
-		Save()
-	end)
+Button(Utility,"FPS Booster: LOW",function()
+	for _,v in pairs(workspace:GetDescendants()) do
+		if v:IsA("BasePart") then v.Material=Enum.Material.Plastic v.Reflectance=0 end
+	end
 end)
 
-Category("Webhook", function()
-	local M = Modal("Webhook")
+-- ================= WEBHOOK =================
+local Webhook = Category("Webhook")
 
-	local Box = Instance.new("TextBox", M)
-	Box.Size = UDim2.new(1,-40,0,40)
-	Box.Position = UDim2.fromOffset(20,60)
-	Box.Text = getgenv().CornelloConfig.Webhook
-	Box.PlaceholderText = "Discord Webhook URL"
-	Box.BackgroundColor3 = Accent
-	Box.TextColor3 = Color3.new(1,1,1)
-	Instance.new("UICorner", Box).CornerRadius = UDim.new(0,12)
-
-	Box.FocusLost:Connect(function()
-		getgenv().CornelloConfig.Webhook = Box.Text
-		Save()
-	end)
+Button(Webhook,"Toggle Webhook",function()
+	getgenv().CornelloConfig.WebhookEnabled = not getgenv().CornelloConfig.WebhookEnabled
+	Save()
 end)
 
--- ================= CORE SYSTEM =================
+Button(Webhook,"Test Webhook",function()
+	if request and getgenv().CornelloConfig.WebhookURL ~= "" then
+		request({
+			Url = getgenv().CornelloConfig.WebhookURL,
+			Method = "POST",
+			Headers = {["Content-Type"]="application/json"},
+			Body = HttpService:JSONEncode({
+				content = "Cornello Utility Webhook Test"
+			})
+		})
+	end
+end)
 
--- Anti AFK
+-- ================= INFO =================
+local Info = Category("Info")
+Button(Info,"Cornello Utility Hub v1.0",function() end)
+Button(Info,"Executor Friendly Script",function() end)
+Button(Info,"Author: CornelloTeam",function() end)
+
+-- ================= CORE =================
 task.spawn(function()
-	while task.wait(getgenv().CornelloConfig.AFKDelay) do
+	while task.wait(600) do
 		if getgenv().CornelloConfig.AntiAFK then
 			VirtualUser:CaptureController()
 			VirtualUser:ClickButton2(Vector2.new())
@@ -255,31 +252,8 @@ task.spawn(function()
 	end
 end)
 
--- FPS Saver (safe)
-local lastQuality
-RunService.Heartbeat:Connect(function()
-	if getgenv().CornelloConfig.FpsSaver then
-		if not lastQuality then
-			lastQuality = settings().Rendering.QualityLevel
-			settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-		end
-	elseif lastQuality then
-		settings().Rendering.QualityLevel = lastQuality
-		lastQuality = nil
-	end
+Icon.MouseButton1Click:Connect(function()
+	Main.Visible = true
+	Main.Size = UDim2.fromScale(0,0)
+	Tween(Main,0.25,{Size=UDim2.fromScale(0.4,0.6)})
 end)
-
--- Auto Reconnect
-LP.OnTeleport:Connect(function(s)
-	if s == Enum.TeleportState.Failed and getgenv().CornelloConfig.AutoReconnect then
-		task.wait(getgenv().CornelloConfig.ReconnectDelay)
-		TeleportService:Teleport(game.PlaceId, LP)
-	end
-end)
-
--- Auto Execute
-if queue and getgenv().CornelloConfig.AutoExecute then
-	queue([[
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Masfadil53818/MyRoblox/main/crnloader.lua", true))()
-	]])
-end
