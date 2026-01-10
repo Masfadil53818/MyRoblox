@@ -19,23 +19,33 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.UPDATESCRIPT }}
           CHANGELOG: ${{ github.event.head_commit.message }}
         run: |
-          ADD=$(printf "%s\n" "$CHANGELOG" | grep '^[+]' | sed 's/^[+] *//' | sed ':a;N;$!ba;s/\n/\\n/g')
-          CHG=$(printf "%s\n" "$CHANGELOG" | grep '^[-]' | sed 's/^[-] *//' | sed ':a;N;$!ba;s/\n/\\n/g')
-          FIX=$(printf "%s\n" "$CHANGELOG" | grep '^[/]' | sed 's%^/ *%%' | sed ':a;N;$!ba;s/\n/\\n/g')
+          ADD=$(printf "%s\n" "$CHANGELOG" | grep '^[+]' | sed 's/^[+] *//' || true)
+          CHG=$(printf "%s\n" "$CHANGELOG" | grep '^[-]' | sed 's/^[-] *//' || true)
+          FIX=$(printf "%s\n" "$CHANGELOG" | grep '^[/]' | sed 's%^/ *%%' || true)
+
+          DESC="Version: $VERSION"
+
+          if [ -n "$ADD" ]; then
+            DESC="$DESC\n\n[ + ] ADD\n\`\`\`\n$ADD\n\`\`\`"
+          fi
+
+          if [ -n "$CHG" ]; then
+            DESC="$DESC\n\n[ - ] CHANGE\n\`\`\`\n$CHG\n\`\`\`"
+          fi
+
+          if [ -n "$FIX" ]; then
+            DESC="$DESC\n\n[ / ] FIX\n\`\`\`\n$FIX\n\`\`\`"
+          fi
 
           curl -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
-              \"username\": \"Update Service\",
+              \"content\": \"Game Script Updated\",
               \"embeds\": [{
-                \"title\": \"Game Script Update\",
-                \"description\": \"Version: $VERSION\n\n[ + ] ADD\n\`\`\`\n$ADD\n\`\`\`\n\n[ - ] CHANGE\n\`\`\`\n$CHG\n\`\`\`\n\n[ / ] FIX\n\`\`\`\n$FIX\n\`\`\`\",
+                \"description\": \"$DESC\",
                 \"color\": 3092790,
                 \"thumbnail\": {
                   \"url\": \"https://ibb.co.com/9mxLgNg7\"
-                },
-                \"footer\": {
-                  \"text\": \"Private Build Update\"
                 }
               }]
             }"
