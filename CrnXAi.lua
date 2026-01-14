@@ -5,8 +5,8 @@
 --==============================--
 -- GITHUB SOURCE
 --==============================--
-local RAW_SCRIPT_URL = "https://raw.githubusercontent.com/USERNAME/REPO/main/script.lua"
-local VERSION_URL    = "https://raw.githubusercontent.com/USERNAME/REPO/main/version.txt"
+local RAW_SCRIPT_URL = "https://raw.githubusercontent.com/Masfadil53818/MyRoblox/main/CrnXAi.lua"
+local VERSION_URL    = "https://raw.githubusercontent.com/Masfadil53818/MyRoblox/main/version.txt"
 
 --==============================--
 -- VERSION
