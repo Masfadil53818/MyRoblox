@@ -1,259 +1,242 @@
---// Cornello Utility Hub ULTIMATE
---// Stable | Animated | Webhook | FPS Boost | Fixed AFK
+--// CornelloTeam Auto Reconnect & Anti AFK
+--// Cyberpunk UI Edition + Tab System + Webhook + AutoExecute FIX
+--// v0.0.3 [BETA] - FULL FIXED
 
-if getgenv().CornelloLoaded then return end
-getgenv().CornelloLoaded = true
+--==============================--
+-- GITHUB SOURCE
+--==============================--
+local RAW_SCRIPT_URL = "https://raw.githubusercontent.com/USERNAME/REPO/main/script.lua"
+local VERSION_URL    = "https://raw.githubusercontent.com/USERNAME/REPO/main/version.txt"
 
--- ================= SERVICES =================
+--==============================--
+-- VERSION
+--==============================--
+local VERSION = "v0.0.3 [BETA]"
+
+--==============================--
+-- SERVICES
+--==============================--
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
+local LocalPlayer = Players.LocalPlayer
 
-local LP = Players.LocalPlayer
-local request = http_request or request or (syn and syn.request)
+--==============================--
+-- CONFIG
+--==============================--
+local CONFIG_FILE = "AutoReconnectConfig.json"
 
--- ================= CONFIG =================
-local CFG = "cornello_config.json"
-getgenv().CornelloConfig = {
-	AntiAFK = false,
-	AutoReconnect = true,
-	AutoSave = true,
-	FPSBoost = "OFF",
-	WebhookEnabled = false,
-	WebhookURL = "",
-	Theme = "Purple"
+local Config = {
+    AutoReconnect = true,
+    AntiAFK = true,
+    WebhookEnabled = false,
+    WebhookURL = "",
+    AutoSave = true,
+    AutoExecute = true
 }
 
 pcall(function()
-	if isfile(CFG) then
-		getgenv().CornelloConfig = HttpService:JSONDecode(readfile(CFG))
-	end
+    if isfile and isfile(CONFIG_FILE) then
+        Config = HttpService:JSONDecode(readfile(CONFIG_FILE))
+    end
 end)
 
-local function Save()
-	if getgenv().CornelloConfig.AutoSave then
-		writefile(CFG, HttpService:JSONEncode(getgenv().CornelloConfig))
-	end
+local function SaveConfig()
+    if Config.AutoSave and writefile then
+        writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
+    end
 end
 
--- ================= THEME =================
-local Themes = {
-	Purple = {
-		Accent = Color3.fromRGB(140,90,220),
-		Dark = Color3.fromRGB(28,28,34)
-	},
-	Blue = {
-		Accent = Color3.fromRGB(80,140,255),
-		Dark = Color3.fromRGB(24,26,32)
-	}
-}
+--==============================--
+-- AUTO EXECUTE AFTER TELEPORT (FIX)
+--==============================--
+pcall(function()
+    if queue_on_teleport and Config.AutoExecute then
+        queue_on_teleport([[
+            task.wait(2)
+            loadstring(game:HttpGet("]] .. RAW_SCRIPT_URL .. [["))()
+        ]])
+    end
+end)
 
-local Theme = Themes[getgenv().CornelloConfig.Theme]
+--==============================--
+-- VERSION CHECK AUTO UPDATE
+--==============================--
+task.spawn(function()
+    if not Config.AutoExecute then return end
+    if not game:IsLoaded() then game.Loaded:Wait() end
 
--- ================= UI ROOT =================
-local UI = Instance.new("ScreenGui", CoreGui)
-UI.Name = "CornelloUI"
-UI.ResetOnSpawn = false
+    pcall(function()
+        local onlineVersion = game:HttpGet(VERSION_URL)
+        if onlineVersion and onlineVersion ~= VERSION then
+            loadstring(game:HttpGet(RAW_SCRIPT_URL))()
+        end
+    end)
+end)
 
-local function Tween(o,t,p)
-	TweenService:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),p):Play()
+--==============================--
+-- WEBHOOK SYSTEM
+--==============================--
+local function SendWebhook(title, desc, color)
+    if not Config.WebhookEnabled or Config.WebhookURL == "" then return end
+    pcall(function()
+        request({
+            Url = Config.WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"]="application/json"},
+            Body = HttpService:JSONEncode({
+                embeds = {{
+                    title = title,
+                    description = desc,
+                    color = color or 65535,
+                    footer = {text="CornelloTeam | "..VERSION}
+                }}
+            })
+        })
+    end)
 end
 
--- ================= FLOAT ICON (LOGO C) =================
-local Icon = Instance.new("TextButton", UI)
-Icon.Size = UDim2.fromOffset(56,56)
-Icon.Position = UDim2.fromScale(0.05,0.5)
-Icon.Text = "C"
-Icon.Font = Enum.Font.GothamBlack
-Icon.TextSize = 26
-Icon.TextColor3 = Color3.new(1,1,1)
-Icon.BackgroundColor3 = Theme.Accent
-Icon.BackgroundTransparency = 0.15
-Instance.new("UICorner", Icon).CornerRadius = UDim.new(1,0)
-
-do
-	local drag,start,pos
-	Icon.InputBegan:Connect(function(i)
-		if i.UserInputType==Enum.UserInputType.MouseButton1 then
-			drag=true start=i.Position pos=Icon.Position
-		end
-	end)
-	UserInputService.InputChanged:Connect(function(i)
-		if drag and i.UserInputType==Enum.UserInputType.MouseMovement then
-			local d=i.Position-start
-			Icon.Position=UDim2.new(pos.X.Scale,pos.X.Offset+d.X,pos.Y.Scale,pos.Y.Offset+d.Y)
-		end
-	end)
-	UserInputService.InputEnded:Connect(function(i)
-		if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
-	end)
+--==============================--
+-- ANTI AFK
+--==============================--
+if Config.AntiAFK then
+    LocalPlayer.Idled:Connect(function()
+        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end)
 end
 
--- ================= MAIN WINDOW =================
-local Main = Instance.new("Frame", UI)
-Main.Size = UDim2.fromScale(0,0)
+--==============================--
+-- DISCONNECT / KICK DETECT
+--==============================--
+GuiService.ErrorMessageChanged:Connect(function(msg)
+    SendWebhook(
+        "❌ Disconnected / Kicked",
+        "**User:** "..LocalPlayer.Name.."\n**Reason:** "..msg,
+        16711680
+    )
+
+    if Config.AutoReconnect then
+        task.wait(5)
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end
+end)
+
+--==============================--
+-- TELEPORT FAILED DETECT
+--==============================--
+TeleportService.TeleportInitFailed:Connect(function(player, result)
+    if player ~= LocalPlayer then return end
+    SendWebhook(
+        "⚠️ Teleport Failed",
+        "**Reason:** ".. tostring(result),
+        16744192
+    )
+    task.wait(3)
+    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+end)
+
+--==============================--
+-- REJOIN SUCCESS DETECT
+--==============================--
+LocalPlayer.CharacterAdded:Connect(function()
+    SendWebhook(
+        "✅ Rejoined Successfully",
+        "**User:** "..LocalPlayer.Name.."\n**Status:** Connected",
+        65280
+    )
+end)
+
+--==============================--
+-- UI ROOT (FIX UI KOSONG)
+--==============================--
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "CornelloTeamCyberUI"
+GUI.ResetOnSpawn = false
+GUI.DisplayOrder = 999999
+GUI.Enabled = true
+
+pcall(function()
+    GUI.Parent = CoreGui
+end)
+
+--==============================--
+-- FLOAT ICON
+--==============================--
+local MiniIcon = Instance.new("TextButton", GUI)
+MiniIcon.Size = UDim2.new(0,48,0,48)
+MiniIcon.Position = UDim2.new(0.02,0,0.4,0)
+MiniIcon.Text = "CT"
+MiniIcon.Font = Enum.Font.GothamBlack
+MiniIcon.TextColor3 = Color3.fromRGB(0,255,255)
+MiniIcon.BackgroundColor3 = Color3.fromRGB(20,20,30)
+MiniIcon.Visible = false
+MiniIcon.Active = true
+MiniIcon.Draggable = true
+Instance.new("UICorner", MiniIcon).CornerRadius = UDim.new(1,0)
+
+--==============================--
+-- MAIN UI
+--==============================--
+local Main = Instance.new("Frame", GUI)
+Main.Size = UDim2.fromScale(0.36,0.46)
 Main.Position = UDim2.fromScale(0.5,0.5)
 Main.AnchorPoint = Vector2.new(0.5,0.5)
-Main.BackgroundColor3 = Theme.Dark
-Main.Visible = false
+Main.BackgroundColor3 = Color3.fromRGB(14,14,20)
+Main.Active = true
+Main.Draggable = true
+Main.Visible = true
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0,18)
 
--- Header
+--==============================--
+-- HEADER
+--==============================--
 local Header = Instance.new("Frame", Main)
-Header.Size = UDim2.new(1,0,0,46)
-Header.BackgroundColor3 = Theme.Accent
-Instance.new("UICorner", Header).CornerRadius = UDim.new(0,18)
+Header.Size = UDim2.new(1,0,0,54)
+Header.BackgroundTransparency = 1
 
 local Title = Instance.new("TextLabel", Header)
-Title.Size = UDim2.new(1,-80,1,0)
-Title.Position = UDim2.fromOffset(12,0)
-Title.Text = "Cornello Utility Hub"
+Title.Size = UDim2.new(1,-160,1,0)
+Title.Position = UDim2.new(0,70,0,0)
+Title.Text = "CornelloTeam "..VERSION
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.TextColor3 = Color3.new(1,1,1)
+Title.TextSize = 14
+Title.TextColor3 = Color3.fromRGB(220,220,255)
 Title.BackgroundTransparency = 1
-Title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Minimize
-local Min = Instance.new("TextButton", Header)
-Min.Size = UDim2.fromOffset(36,36)
-Min.Position = UDim2.new(1,-42,0.5,-18)
-Min.Text = "–"
-Min.Font = Enum.Font.GothamBold
-Min.TextSize = 22
-Min.TextColor3 = Color3.new(1,1,1)
-Min.BackgroundTransparency = 1
-
-Min.MouseButton1Click:Connect(function()
-	Tween(Main,0.25,{Size=UDim2.fromScale(0,0)})
-	task.delay(0.25,function() Main.Visible=false end)
-end)
-
--- ================= CONTENT (SCROLL FIX) =================
-local Content = Instance.new("ScrollingFrame", Main)
-Content.Position = UDim2.fromOffset(0,56)
-Content.Size = UDim2.new(1,0,1,-60)
-Content.CanvasSize = UDim2.new(0,0,0,0)
-Content.ScrollBarImageTransparency = 0.8
-Content.BackgroundTransparency = 1
-Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-
-local Layout = Instance.new("UIListLayout", Content)
-Layout.Padding = UDim.new(0,10)
-
--- ================= CATEGORY =================
-local function Category(name)
-	local Holder = Instance.new("Frame", Content)
-	Holder.Size = UDim2.new(1,-30,0,46)
-	Holder.BackgroundTransparency = 1
-
-	local Btn = Instance.new("TextButton", Holder)
-	Btn.Size = UDim2.new(1,0,0,46)
-	Btn.Text = name
-	Btn.Font = Enum.Font.GothamMedium
-	Btn.TextSize = 15
-	Btn.TextColor3 = Color3.new(1,1,1)
-	Btn.BackgroundColor3 = Theme.Accent
-	Instance.new("UICorner", Btn).CornerRadius = UDim.new(0,12)
-
-	local Panel = Instance.new("Frame", Holder)
-	Panel.Position = UDim2.fromOffset(0,52)
-	Panel.Size = UDim2.new(1,0,0,0)
-	Panel.ClipsDescendants = true
-	Panel.BackgroundColor3 = Color3.fromRGB(40,40,50)
-	Instance.new("UICorner", Panel).CornerRadius = UDim.new(0,12)
-
-	local PL = Instance.new("UIListLayout", Panel)
-	PL.Padding = UDim.new(0,8)
-
-	local open=false
-	local function Refresh()
-		local h=open and (PL.AbsoluteContentSize.Y+12) or 0
-		Tween(Panel,0.25,{Size=UDim2.new(1,0,0,h)})
-		Tween(Holder,0.25,{Size=UDim2.new(1,-30,0,46+h)})
-	end
-
-	Btn.MouseButton1Click:Connect(function()
-		open=not open
-		Refresh()
-	end)
-
-	return Panel
+local function IOS(color, x)
+    local b = Instance.new("TextButton", Header)
+    b.Size = UDim2.new(0,14,0,14)
+    b.Position = UDim2.new(1,x,0.5,-7)
+    b.BackgroundColor3 = color
+    b.Text = ""
+    Instance.new("UICorner", b).CornerRadius = UDim.new(1,0)
+    return b
 end
 
-local function Button(parent,text,callback)
-	local B=Instance.new("TextButton",parent)
-	B.Size=UDim2.new(1,-20,0,36)
-	B.Text=text
-	B.Font=Enum.Font.Gotham
-	B.TextSize=14
-	B.TextColor3=Color3.new(1,1,1)
-	B.BackgroundColor3=Theme.Accent
-	Instance.new("UICorner",B).CornerRadius=UDim.new(0,10)
-	B.MouseButton1Click:Connect(callback)
-	return B
-end
+local Close = IOS(Color3.fromRGB(255,90,90), -22)
+local Minimize = IOS(Color3.fromRGB(255,200,60), -44)
 
--- ================= UTILITY =================
-local Utility = Category("Utility")
-
-local AntiBtn
-AntiBtn = Button(Utility,"Anti AFK: OFF",function()
-	getgenv().CornelloConfig.AntiAFK = not getgenv().CornelloConfig.AntiAFK
-	AntiBtn.Text = "Anti AFK: "..(getgenv().CornelloConfig.AntiAFK and "ON" or "OFF")
-	Save()
+--==============================--
+-- BUTTON ACTION
+--==============================--
+Minimize.MouseButton1Click:Connect(function()
+    Main.Visible = false
+    MiniIcon.Visible = true
 end)
 
-Button(Utility,"FPS Booster: LOW",function()
-	for _,v in pairs(workspace:GetDescendants()) do
-		if v:IsA("BasePart") then v.Material=Enum.Material.Plastic v.Reflectance=0 end
-	end
+MiniIcon.MouseButton1Click:Connect(function()
+    Main.Visible = true
+    MiniIcon.Visible = false
 end)
 
--- ================= WEBHOOK =================
-local Webhook = Category("Webhook")
-
-Button(Webhook,"Toggle Webhook",function()
-	getgenv().CornelloConfig.WebhookEnabled = not getgenv().CornelloConfig.WebhookEnabled
-	Save()
+Close.MouseButton1Click:Connect(function()
+    GUI:Destroy()
 end)
 
-Button(Webhook,"Test Webhook",function()
-	if request and getgenv().CornelloConfig.WebhookURL ~= "" then
-		request({
-			Url = getgenv().CornelloConfig.WebhookURL,
-			Method = "POST",
-			Headers = {["Content-Type"]="application/json"},
-			Body = HttpService:JSONEncode({
-				content = "Cornello Utility Webhook Test"
-			})
-		})
-	end
-end)
-
--- ================= INFO =================
-local Info = Category("Info")
-Button(Info,"Cornello Utility Hub v1.0",function() end)
-Button(Info,"Executor Friendly Script",function() end)
-Button(Info,"Author: CornelloTeam",function() end)
-
--- ================= CORE =================
-task.spawn(function()
-	while task.wait(600) do
-		if getgenv().CornelloConfig.AntiAFK then
-			VirtualUser:CaptureController()
-			VirtualUser:ClickButton2(Vector2.new())
-		end
-	end
-end)
-
-Icon.MouseButton1Click:Connect(function()
-	Main.Visible = true
-	Main.Size = UDim2.fromScale(0,0)
-	Tween(Main,0.25,{Size=UDim2.fromScale(0.4,0.6)})
-end)
+print("✅ CornelloTeam Cyberpunk UI Loaded | "..VERSION)
